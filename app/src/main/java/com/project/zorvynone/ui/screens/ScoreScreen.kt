@@ -1,8 +1,7 @@
 package com.project.zorvynone.ui.screens
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +18,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.SpanStyle
@@ -39,6 +40,15 @@ data class ScoreHabit(
     val acceptText: String, val rejectText: String
 )
 
+// --- GLOBAL SHIMMER BRUSH IMPORTED FOR SCORE SCREEN ---
+@Composable
+fun scoreShimmerBrush(): Brush {
+    val shimmerColors = listOf(Color.White.copy(alpha = 0.03f), Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.03f))
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translateAnim by transition.animateFloat(initialValue = 0f, targetValue = 2000f, animationSpec = infiniteRepeatable(animation = tween(durationMillis = 1000, easing = LinearEasing), repeatMode = RepeatMode.Restart), label = "shimmerAnim")
+    return Brush.linearGradient(colors = shimmerColors, start = Offset.Zero, end = Offset(x = translateAnim, y = translateAnim))
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScoreScreen(
@@ -52,23 +62,8 @@ fun ScoreScreen(
     val baseScore by viewModel.baseScore.collectAsStateWithLifecycle()
     val premiumGold = Color(0xFFE5C158)
 
-    // DYNAMIC STATUS HELPERS
-    val getStatusText: (Int) -> String = { s ->
-        when {
-            s >= 90 -> "Excellent"
-            s >= 74 -> "Good Standing"
-            s >= 50 -> "Fair"
-            else -> "Needs Attention"
-        }
-    }
-    val getStatusColor: (Int) -> Color = { s ->
-        when {
-            s >= 90 -> ZorvynGreen
-            s >= 74 -> premiumGold
-            s >= 50 -> Color(0xFFF59E0B) // Amber
-            else -> ZorvynRed
-        }
-    }
+    val getStatusText: (Int) -> String = { s -> when { s >= 90 -> "Excellent"; s >= 74 -> "Good Standing"; s >= 50 -> "Fair"; else -> "Needs Attention" } }
+    val getStatusColor: (Int) -> Color = { s -> when { s >= 90 -> ZorvynGreen; s >= 74 -> premiumGold; s >= 50 -> Color(0xFFF59E0B); else -> ZorvynRed } }
 
     val acceptedHabits by viewModel.acceptedHabitIds.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf("Spending") }
@@ -81,21 +76,9 @@ fun ScoreScreen(
 
     val habits = if (activeData.isNotEmpty()) {
         activeData.mapIndexed { index, data ->
-            val icon = when(data.category.lowercase(java.util.Locale.ROOT)) {
-                "food", "café" -> Icons.Default.Restaurant
-                "shopping" -> Icons.Default.ShoppingCart
-                "housing" -> Icons.Default.Home
-                "transport" -> Icons.Default.DirectionsCar
-                else -> Icons.Default.Receipt
-            }
+            val icon = when(data.category.lowercase(java.util.Locale.ROOT)) { "food", "café" -> Icons.Default.Restaurant; "shopping" -> Icons.Default.ShoppingCart; "housing" -> Icons.Default.Home; "transport" -> Icons.Default.DirectionsCar; else -> Icons.Default.Receipt }
             val color = when(index % 3) { 0 -> ZorvynBlueText; 1 -> ZorvynRed; else -> Color(0xFFA288E3) }
-
-            ScoreHabit(
-                id = "habit_$index", icon = icon, iconTint = color,
-                category = data.category, title = data.title, description = data.description,
-                points = data.points, statAmount = data.statAmount, statLabel = data.statLabel,
-                acceptText = data.acceptText, rejectText = data.rejectText
-            )
+            ScoreHabit(id = "habit_$index", icon = icon, iconTint = color, category = data.category, title = data.title, description = data.description, points = data.points, statAmount = data.statAmount, statLabel = data.statLabel, acceptText = data.acceptText, rejectText = data.rejectText)
         }
     } else {
         listOf(ScoreHabit("dummy", Icons.Default.AccountBalanceWallet, ZorvynBlueText, "NO DATA YET", "Add expenses to get insights", "We need some transaction data first.", 0, "₹0", "spent", "Okay", "Skip"))
@@ -107,74 +90,23 @@ fun ScoreScreen(
 
     Scaffold(
         containerColor = ZorvynBackground,
-        // NEW: Injected the Bottom Navigation Bar into the Score Screen
-        bottomBar = {
-            BottomNavBar(
-                currentRoute = "score",
-                onHomeClick = onNavigateHome,
-                onTxnsClick = onNavigateTxns,
-                onAddClick = onNavigateAdd,
-                onInsightsClick = onNavigateInsights,
-                onScoreNavClick = {} // Already here
-            )
-        }
+        bottomBar = { BottomNavBar(currentRoute = "score", onHomeClick = onNavigateHome, onTxnsClick = onNavigateTxns, onAddClick = onNavigateAdd, onInsightsClick = onNavigateInsights, onScoreNavClick = {}) }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 20.dp).verticalScroll(rememberScrollState())) {
             Spacer(modifier = Modifier.height(24.dp))
-
-            // 1. BACK BUTTON
-            Box(modifier = Modifier.size(44.dp).background(ZorvynSurface, CircleShape).clickable { onNavigateBack() }, contentAlignment = Alignment.Center) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextSecondary, modifier = Modifier.size(20.dp))
-            }
-
+            Box(modifier = Modifier.size(44.dp).background(ZorvynSurface, CircleShape).clickable { onNavigateBack() }, contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextSecondary, modifier = Modifier.size(20.dp)) }
             Spacer(modifier = Modifier.height(32.dp))
 
-            // 2. UPGRADED PREMIUM HEADER TYPOGRAPHY
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "ZORVYN HEALTH SCORE",
-                    color = TextSecondary.copy(alpha = 0.7f),
-                    fontSize = 12.sp,
-                    letterSpacing = 2.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(text = "ZORVYN HEALTH SCORE", color = TextSecondary.copy(alpha = 0.7f), fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    buildAnnotatedString {
-                        withStyle(SpanStyle(color = TextPrimary)) { append("The Score You\n") }
-                        withStyle(SpanStyle(color = premiumGold)) { append("Control.") }
-                    },
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.Black,
-                    lineHeight = 44.sp,
-                    letterSpacing = (-1.5).sp
-                )
+                Text(buildAnnotatedString { withStyle(SpanStyle(color = TextPrimary)) { append("The Score You\n") }; withStyle(SpanStyle(color = premiumGold)) { append("Control.") } }, fontSize = 42.sp, fontWeight = FontWeight.Black, lineHeight = 44.sp, letterSpacing = (-1.5).sp)
             }
-
             Spacer(modifier = Modifier.height(20.dp))
-
-            Text(
-                text = "Unlike traditional bureau scores, your Zorvyn Score reacts instantly to your income, expenses and financial discipline.",
-                color = TextSecondary.copy(alpha = 0.7f),
-                fontSize = 15.sp,
-                lineHeight = 22.sp
-            )
-
+            Text(text = "Unlike traditional bureau scores, your Zorvyn Score reacts instantly to your income, expenses and financial discipline.", color = TextSecondary.copy(alpha = 0.7f), fontSize = 15.sp, lineHeight = 22.sp)
             Spacer(modifier = Modifier.height(32.dp))
 
-            // 3. COMPARISON CARD
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = ZorvynSurface),
-                border = BorderStroke(1.dp, TextSecondary.copy(alpha = 0.15f))
-            ) {
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = ZorvynSurface), border = BorderStroke(1.dp, TextSecondary.copy(alpha = 0.15f))) {
                 Column {
                     Row(modifier = Modifier.fillMaxWidth().padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
@@ -182,8 +114,6 @@ fun ScoreScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             Text("$baseScore", color = getStatusColor(baseScore), fontSize = 42.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(4.dp))
-
-                            // DYNAMIC TEXT
                             Text(getStatusText(baseScore), color = getStatusColor(baseScore), fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         }
                         Box(modifier = Modifier.width(1.dp).height(100.dp).background(TextSecondary.copy(alpha = 0.15f)))
@@ -197,48 +127,37 @@ fun ScoreScreen(
                                     Icon(Icons.Default.ArrowDropUp, contentDescription = null, tint = ZorvynGreen, modifier = Modifier.size(16.dp))
                                     Text("+$totalBonus pts", color = ZorvynGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 }
-                            } else {
-                                Text("No change", color = TextSecondary.copy(alpha = 0.5f), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            }
+                            } else { Text("No change", color = TextSecondary.copy(alpha = 0.5f), fontSize = 14.sp, fontWeight = FontWeight.Medium) }
                         }
                     }
-
-                    // The Bottom Custom Tabs inside the Card
                     Row(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 24.dp)) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("CURRENT", color = premiumGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Box(modifier = Modifier.height(2.dp).fillMaxWidth(0.85f).background(premiumGold))
-                        }
-                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                            Text("PROJECTED", color = TextSecondary.copy(alpha = 0.5f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Box(modifier = Modifier.height(2.dp).fillMaxWidth(0.85f).background(TextSecondary.copy(alpha = 0.2f)))
-                        }
+                        Column(modifier = Modifier.weight(1f)) { Text("CURRENT", color = premiumGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp); Spacer(modifier = Modifier.height(6.dp)); Box(modifier = Modifier.height(2.dp).fillMaxWidth(0.85f).background(premiumGold)) }
+                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) { Text("PROJECTED", color = TextSecondary.copy(alpha = 0.5f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp); Spacer(modifier = Modifier.height(6.dp)); Box(modifier = Modifier.height(2.dp).fillMaxWidth(0.85f).background(TextSecondary.copy(alpha = 0.2f))) }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Filter Chips
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilterChip(selected = selectedTab == "Spending", onClick = { selectedTab = "Spending" }, label = { Text("Spending", modifier = Modifier.padding(horizontal = 8.dp)) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = premiumGold.copy(alpha = 0.15f), selectedLabelColor = premiumGold, containerColor = ZorvynSurface, labelColor = TextSecondary), border = null, shape = RoundedCornerShape(12.dp))
                 FilterChip(selected = selectedTab == "Savings", onClick = { selectedTab = "Savings" }, label = { Text("Savings", modifier = Modifier.padding(horizontal = 8.dp)) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = premiumGold.copy(alpha = 0.15f), selectedLabelColor = premiumGold, containerColor = ZorvynSurface, labelColor = TextSecondary), border = null, shape = RoundedCornerShape(12.dp))
             }
-
             Spacer(modifier = Modifier.height(24.dp))
 
             if (selectedTab == "Spending") {
-                habits.forEach { habit ->
-                    val isAccepted = acceptedHabits.contains(habit.id)
-                    HabitCard(
-                        habit = habit,
-                        isAccepted = isAccepted,
-                        onAccept = { viewModel.toggleHabit(habit.id) },
-                        onReject = { if(isAccepted) viewModel.toggleHabit(habit.id) }
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                // NEW: SHIMMER SKELETON LOADERS
+                if (isScoreLoading) {
+                    repeat(2) {
+                        ShimmerHabitCard()
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                } else {
+                    habits.forEach { habit ->
+                        val isAccepted = acceptedHabits.contains(habit.id)
+                        HabitCard(habit = habit, isAccepted = isAccepted, onAccept = { viewModel.toggleHabit(habit.id) }, onReject = { if(isAccepted) viewModel.toggleHabit(habit.id) })
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -248,14 +167,7 @@ fun ScoreScreen(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("Tap below to generate a personalized AI plan.", color = TextSecondary, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().background(Color(0xFF2A2045), RoundedCornerShape(12.dp)).clickable(enabled = !isScoreLoading) {
-                            // ⚠️ PASTE YOUR API KEY HERE ⚠️
-                            viewModel.generateScoreHabits("PASTE_YOUR_API_KEY_HERE")
-                        }.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF2A2045), RoundedCornerShape(12.dp)).clickable(enabled = !isScoreLoading) { viewModel.generateScoreHabits("AIzaSyBv5gW1DjAbe0mj65vJlns0pS9sCbNRFEs") }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.AutoAwesome, contentDescription = "AI", tint = Color(0xFFA288E3), modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
@@ -276,25 +188,40 @@ fun ScoreScreen(
                     }
                 }
             }
-
             Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = {
-                    viewModel.savePlan(totalBonus) // TELLS THE HOME SCREEN TO UPDATE!
-                    onNavigateBack()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = premiumGold.copy(alpha = if (acceptedHabits.isNotEmpty()) 1f else 0.5f)),
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                enabled = acceptedHabits.isNotEmpty()
-            ) {
+            Button(onClick = { viewModel.savePlan(totalBonus); onNavigateBack() }, colors = ButtonDefaults.buttonColors(containerColor = premiumGold.copy(alpha = if (acceptedHabits.isNotEmpty()) 1f else 0.5f)), modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp), enabled = acceptedHabits.isNotEmpty()) {
                 Icon(Icons.Default.Check, contentDescription = null, tint = ZorvynBackground)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Set My Plan", color = ZorvynBackground, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
-
             Spacer(modifier = Modifier.height(40.dp))
+        }
+    }
+}
+
+// --- NEW SHIMMER SKELETON CARD ---
+@Composable
+fun ShimmerHabitCard() {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = ZorvynSurface), shape = RoundedCornerShape(20.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Box(modifier = Modifier.size(40.dp).background(scoreShimmerBrush(), RoundedCornerShape(12.dp)))
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Box(modifier = Modifier.width(60.dp).height(12.dp).background(scoreShimmerBrush(), RoundedCornerShape(4.dp)))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.fillMaxWidth().height(16.dp).background(scoreShimmerBrush(), RoundedCornerShape(4.dp)))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(modifier = Modifier.fillMaxWidth(0.8f).height(14.dp).background(scoreShimmerBrush(), RoundedCornerShape(4.dp)))
+                }
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+            Box(modifier = Modifier.fillMaxWidth().height(48.dp).background(scoreShimmerBrush(), RoundedCornerShape(12.dp)))
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(modifier = Modifier.weight(1f).height(48.dp).background(scoreShimmerBrush(), RoundedCornerShape(12.dp)))
+                Box(modifier = Modifier.weight(1f).height(48.dp).background(scoreShimmerBrush(), RoundedCornerShape(12.dp)))
+            }
         }
     }
 }

@@ -74,6 +74,118 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
     }
 
     // ==========================================
+    //       VOICE AI ASSISTANT INTEGRATION
+    // ==========================================
+
+    private val _isVoiceLoading = MutableStateFlow(false)
+    val isVoiceLoading: StateFlow<Boolean> = _isVoiceLoading.asStateFlow()
+
+    fun processVoiceTransaction(spokenText: String, apiKey: String) {
+        if (_isVoiceLoading.value) return
+
+        viewModelScope.launch {
+            _isVoiceLoading.value = true
+            try {
+                // We force Gemini to output strict JSON
+                val prompt = """
+                    You are a financial AI assistant. The user just said: "$spokenText".
+                    Extract the transaction details and return ONLY a valid JSON object. Do not include markdown formatting, backticks, or the word "json".
+                    
+                    Rules:
+                    1. amount: Integer (extract the exact number spoken).
+                    2. title: String (e.g., "Uber Ride", "Starbucks", "Groceries").
+                    3. isIncome: Boolean (true if receiving money/salary, false if spending).
+                    4. category: String (Choose the best fit from: "Food", "Transport", "Shopping", "Housing", "Salary", "Miscellaneous").
+                    5. iconType: String (Choose the exact match: "FOOD", "TRANSPORT", "SHOPPING", "HOUSING", "SALARY", "DEFAULT").
+                    
+                    Example Output:
+                    {
+                      "title": "Uber Ride",
+                      "amount": 450,
+                      "isIncome": false,
+                      "category": "Transport",
+                      "iconType": "TRANSPORT"
+                    }
+                """.trimIndent()
+
+                val result = withContext(Dispatchers.IO) {
+                    val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
+                    val connection = url.openConnection() as java.net.HttpURLConnection
+                    connection.requestMethod = "POST"
+                    connection.setRequestProperty("Content-Type", "application/json")
+                    connection.doOutput = true
+                    connection.connectTimeout = 15000
+                    connection.readTimeout = 15000
+
+                    val requestBody = JSONObject().apply {
+                        put("contents", JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("parts", JSONArray().apply {
+                                    put(JSONObject().apply {
+                                        put("text", prompt)
+                                    })
+                                })
+                            })
+                        })
+                    }.toString()
+
+                    connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+                    val responseCode = connection.responseCode
+                    if (responseCode == 200) {
+                        connection.inputStream.bufferedReader().readText()
+                    } else {
+                        val errorText = connection.errorStream?.bufferedReader()?.readText() ?: "Unknown error"
+                        throw Exception("API Error $responseCode: $errorText")
+                    }
+                }
+
+                // 1. Parse Gemini's standard response wrapper
+                val responseJson = JSONObject(result)
+                var text = responseJson
+                    .getJSONArray("candidates")
+                    .getJSONObject(0)
+                    .getJSONObject("content")
+                    .getJSONArray("parts")
+                    .getJSONObject(0)
+                    .getString("text")
+
+                // 2. Clean the string (Gemini sometimes adds ```json ... ``` markdown despite our prompt)
+                text = text.replace("```json", "").replace("```", "").trim()
+
+                // 3. Parse our generated JSON object
+                val txnJson = JSONObject(text)
+
+                val categoryStr = txnJson.getString("category")
+                val isIncomeVal = txnJson.getBoolean("isIncome")
+                val dateMillis = System.currentTimeMillis()
+                val dateString = SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(dateMillis))
+                val finalSubtitle = if (isIncomeVal) "Voice Income • $dateString" else "$categoryStr • $dateString"
+
+                val newTxn = Transaction(
+                    title = txnJson.getString("title"),
+                    subtitle = finalSubtitle,
+                    amount = txnJson.getInt("amount"),
+                    isIncome = isIncomeVal,
+                    category = categoryStr,
+                    date = dateMillis,
+                    note = "Added via Voice AI",
+                    iconType = IconType.valueOf(txnJson.getString("iconType"))
+                )
+
+                // 4. Save directly to the database
+                dao.insertTransaction(newTxn)
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isVoiceLoading.value = false
+            }
+        }
+    }
+
+
+    // ==========================================
     //          HOME SCREEN AI INTEGRATION
     // ==========================================
 
@@ -175,7 +287,6 @@ Format your response as a simple list where each insight starts with a dash (-).
         val acceptText: String, val rejectText: String
     )
 
-    // LOCAL BRAIN: Generates fallback habits instantly based on real SQLite data
     val defaultScoreHabits: StateFlow<List<AiHabitData>> = transactions.map { txns ->
         val expenses = txns.filter { !it.isIncome }
         if (expenses.isEmpty()) return@map emptyList()
@@ -188,7 +299,7 @@ Format your response as a simple list where each insight starts with a dash (-).
         val formatter = java.text.NumberFormat.getNumberInstance(Locale("en", "IN"))
 
         topCategories.mapIndexed { index, entry ->
-            val points = 6 - index // Gives 6 pts for largest expense, then 5, then 4
+            val points = 6 - index
             val formattedAmount = formatter.format(entry.value)
 
             AiHabitData(
@@ -300,35 +411,27 @@ Format your response as a simple list where each insight starts with a dash (-).
             }
         }
     }
+
     // ==========================================
     //       PERSISTENT PLAN STATE
     // ==========================================
     private val _savedBonus = MutableStateFlow(0)
 
-    // THE CUSTOM ZORVYN SCORE ALGORITHM
     val baseScore: StateFlow<Int> = kotlinx.coroutines.flow.combine(totalIncome, totalExpenses) { income, expense ->
         if (income == 0) {
-            // If they haven't logged income yet, give a default score of 50
             if (expense == 0) 50 else 45
         } else {
-            // Calculate Savings Ratio
             val savings = income - expense
             val ratio = savings.toFloat() / income.toFloat()
-
-            // Formula: 50 base score + (Savings Ratio * 100)
-            // Example 1: Saving 24% of income -> 50 + 24 = 74
-            // Example 2: Overspending by 10% -> 50 - 10 = 40
             (50 + (ratio * 100)).toInt()
         }
-    }.map { it.coerceIn(30, 99) } // Clamp the score between 30 and 99
+    }.map { it.coerceIn(30, 99) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 50)
 
-    // Automatically calculates your new global score (Dynamic Base + AI Bonus)
     val currentScore: StateFlow<Int> = kotlinx.coroutines.flow.combine(baseScore, _savedBonus) { base, bonus ->
-        (base + bonus).coerceAtMost(100) // Ensure it never goes past 100
+        (base + bonus).coerceAtMost(100)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 50)
 
-    // Remembers which buttons you clicked so they stay green
     private val _acceptedHabitIds = MutableStateFlow<Set<String>>(emptySet())
     val acceptedHabitIds = _acceptedHabitIds.asStateFlow()
 
