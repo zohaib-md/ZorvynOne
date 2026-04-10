@@ -2,28 +2,8 @@ package com.project.zorvynone.model
 
 import android.content.Context
 import androidx.room.*
-import kotlinx.coroutines.flow.Flow
 
-@Dao
-interface TransactionDao {
-    // Now sorts by the actual timestamp!
-    @Query("SELECT * FROM transactions ORDER BY date DESC, id DESC")
-    fun getAllTransactions(): Flow<List<Transaction>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTransaction(transaction: Transaction)
-
-    @Delete
-    suspend fun deleteTransaction(transaction: Transaction)
-
-    @Query("SELECT SUM(amount) FROM transactions WHERE isIncome = 1")
-    fun getTotalIncome(): Flow<Int?>
-
-    @Query("SELECT SUM(amount) FROM transactions WHERE isIncome = 0")
-    fun getTotalExpense(): Flow<Int?>
-}
-
-// BUMPED VERSION TO 2
+// ONLY the Database class stays here
 @Database(entities = [Transaction::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
@@ -39,7 +19,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "zorvyn_database"
                 )
-                    .fallbackToDestructiveMigration() // Wipes the old database to apply the new blueprint safely
+                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance

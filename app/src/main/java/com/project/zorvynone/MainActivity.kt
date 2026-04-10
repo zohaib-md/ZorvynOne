@@ -5,18 +5,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -27,30 +33,27 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.project.zorvynone.model.AppDatabase
-import com.project.zorvynone.ui.screens.AddTransactionScreen
-import com.project.zorvynone.ui.screens.HomeScreen
-import com.project.zorvynone.ui.screens.InsightsScreen
-import com.project.zorvynone.ui.screens.ScoreScreen
-import com.project.zorvynone.ui.screens.TransactionsScreen
+import com.project.zorvynone.ui.screens.*
 import com.project.zorvynone.ui.theme.ZorvynBackground
 import com.project.zorvynone.ui.theme.ZorvynOneTheme
 import com.project.zorvynone.viewmodel.HomeViewModel
 import kotlinx.coroutines.delay
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.unit.Dp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 1. Install the official Splash API (Must be before super.onCreate)
+        // 1. Install the official Splash API
         val splashScreen = installSplashScreen()
 
         super.onCreate(savedInstanceState)
 
+        // 2. Deep Link Check: Did the user tap the Widget '+'?
+        val navTarget = intent.getStringExtra("nav")
+        val initialRoute = if (navTarget == "add") "add_transaction" else "home"
+
         val db = AppDatabase.getDatabase(applicationContext)
         val factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
                 return HomeViewModel(db.transactionDao()) as T
             }
         }
@@ -65,9 +68,9 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val viewModel: HomeViewModel = viewModel(factory = factory)
 
-                    // 2. The Premium Entrance Transition
                     if (showMainContent) {
-                        AppNavigation(viewModel = viewModel)
+                        // Land on the correct screen based on the entry point
+                        AppNavigation(viewModel = viewModel, startRoute = initialRoute)
                     } else {
                         ExpectrAnimatedSplash(onAnimFinished = { showMainContent = true })
                     }
@@ -81,19 +84,14 @@ class MainActivity : ComponentActivity() {
 fun ExpectrAnimatedSplash(onAnimFinished: () -> Unit) {
     var startAnimation by remember { mutableStateOf(false) }
 
-    // --- Shimmer (unchanged logic) ---
     val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
-    val shimmerOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmerOffset"
-    )
 
-    // --- Scale & alpha (unchanged logic) ---
+    // Animations Logic
+    val shimmerOffset by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1000f,
+        animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing), RepeatMode.Restart),
+        label = "shimmer"
+    )
     val scale by animateFloatAsState(
         targetValue = if (startAnimation) 1.1f else 0.9f,
         animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessVeryLow),
@@ -104,70 +102,29 @@ fun ExpectrAnimatedSplash(onAnimFinished: () -> Unit) {
         animationSpec = tween(1000),
         label = "alpha"
     )
-
-    // --- NEW: Pulsing central glow ---
     val glowPulse by infiniteTransition.animateFloat(
-        initialValue = 0.15f,
-        targetValue = 0.45f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glowPulse"
+        initialValue = 0.15f, targetValue = 0.45f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "glow"
     )
-
-    // --- NEW: Slow rotating outer ring ---
     val ringRotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(8000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ringRotation"
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing), RepeatMode.Restart),
+        label = "ring"
     )
 
-    // --- NEW: Particle floats (6 particles, each with own Y offset) ---
-    val p1y by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = -18f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "p1"
-    )
-    val p2y by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = -12f,
-        animationSpec = infiniteRepeatable(tween(1700, delayMillis = 300, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "p2"
-    )
-    val p3y by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = -22f,
-        animationSpec = infiniteRepeatable(tween(2600, delayMillis = 700, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "p3"
-    )
-    val p4y by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = -10f,
-        animationSpec = infiniteRepeatable(tween(1900, delayMillis = 500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "p4"
-    )
-    val p5y by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = -16f,
-        animationSpec = infiniteRepeatable(tween(2400, delayMillis = 1000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "p5"
-    )
-    val p6y by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = -20f,
-        animationSpec = infiniteRepeatable(tween(2000, delayMillis = 200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "p6"
-    )
+    // Particle Logic
+    val p1y by infiniteTransition.animateFloat(0f, -18f, infiniteRepeatable(tween(2200), RepeatMode.Reverse))
+    val p2y by infiniteTransition.animateFloat(0f, -12f, infiniteRepeatable(tween(1700, 300), RepeatMode.Reverse))
+    val p3y by infiniteTransition.animateFloat(0f, -22f, infiniteRepeatable(tween(2600, 700), RepeatMode.Reverse))
+    val p4y by infiniteTransition.animateFloat(0f, -10f, infiniteRepeatable(tween(1900, 500), RepeatMode.Reverse))
+    val p5y by infiniteTransition.animateFloat(0f, -16f, infiniteRepeatable(tween(2400, 1000), RepeatMode.Reverse))
+    val p6y by infiniteTransition.animateFloat(0f, -20f, infiniteRepeatable(tween(2000, 200), RepeatMode.Reverse))
 
-    // --- NEW: Diagonal scan line ---
     val scanLine by infiniteTransition.animateFloat(
-        initialValue = -400f,
-        targetValue = 400f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "scanLine"
+        initialValue = -400f, targetValue = 400f,
+        animationSpec = infiniteRepeatable(tween(3000, easing = LinearEasing), RepeatMode.Restart),
+        label = "scan"
     )
 
     LaunchedEffect(Unit) {
@@ -177,287 +134,83 @@ fun ExpectrAnimatedSplash(onAnimFinished: () -> Unit) {
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(Color(0xFF1C2238), Color(0xFF07090F)),
-                    center = Offset.Unspecified,
-                    radius = 2000f
-                )
-            ),
+        modifier = Modifier.fillMaxSize()
+            .background(Brush.radialGradient(colors = listOf(Color(0xFF1C2238), Color(0xFF07090F)), radius = 2000f)),
         contentAlignment = Alignment.Center
     ) {
+        // LAYER 1: Background Glow
+        Box(modifier = Modifier.size(420.dp).graphicsLayer(alpha = glowPulse)
+            .background(Brush.radialGradient(colors = listOf(Color(0xFFA288E3).copy(0.25f), Color(0xFF5B8DEF).copy(0.08f), Color.Transparent))))
 
-        // ── LAYER 1: Deep background glow (existing, enhanced pulse) ──────────
-        Box(
-            modifier = Modifier
-                .size(420.dp)
-                .graphicsLayer(alpha = glowPulse)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            Color(0xFFA288E3).copy(alpha = 0.25f),
-                            Color(0xFF5B8DEF).copy(alpha = 0.08f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-
-        // ── LAYER 2: Rotating dashed-look ring ────────────────────────────────
-        Canvas(
-            modifier = Modifier
-                .size(260.dp)
-                .graphicsLayer(
-                    rotationZ = ringRotation,
-                    alpha = if (startAnimation) 0.18f else 0f
-                )
-        ) {
-            val stroke = androidx.compose.ui.graphics.drawscope.Stroke(
-                width = 1f,
-                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
-                    floatArrayOf(12f, 18f), 0f
-                )
-            )
-            drawCircle(
-                color = Color(0xFFA288E3),
-                radius = size.minDimension / 2f,
-                style = stroke
-            )
+        // LAYER 2 & 3: Rotating Rings
+        Canvas(modifier = Modifier.size(260.dp).graphicsLayer(rotationZ = ringRotation, alpha = if (startAnimation) 0.18f else 0f)) {
+            drawCircle(Color(0xFFA288E3), style = Stroke(1f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 18f), 0f)))
+        }
+        Canvas(modifier = Modifier.size(200.dp).graphicsLayer(rotationZ = -ringRotation * 0.6f, alpha = if (startAnimation) 0.12f else 0f)) {
+            drawCircle(Color(0xFFE5C158), style = Stroke(0.7f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 24f), 0f)))
         }
 
-        // ── LAYER 3: Second counter-rotating ring (smaller, gold) ─────────────
-        Canvas(
-            modifier = Modifier
-                .size(200.dp)
-                .graphicsLayer(
-                    rotationZ = -ringRotation * 0.6f,
-                    alpha = if (startAnimation) 0.12f else 0f
-                )
-        ) {
-            val stroke = androidx.compose.ui.graphics.drawscope.Stroke(
-                width = 0.7f,
-                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
-                    floatArrayOf(6f, 24f), 0f
-                )
-            )
-            drawCircle(
-                color = Color(0xFFE5C158),
-                radius = size.minDimension / 2f,
-                style = stroke
-            )
-        }
-
-        // ── LAYER 4: Floating particles ───────────────────────────────────────
+        // LAYER 4: Floating Particles
         if (startAnimation) {
-            // Particle data: (x offset dp, y base dp, size dp, color alpha, yAnim)
-            data class Particle(val x: Dp, val yBase: Dp, val size: Dp, val colorAlpha: Float, val dy: Float)
-
             val particles = listOf(
-                Particle((-90).dp, (-60).dp, 3.dp, 0.5f, p1y),
-                Particle(80.dp, (-80).dp, 2.dp, 0.35f, p2y),
-                Particle((-110).dp, 30.dp, 2.dp, 0.4f, p3y),
-                Particle(100.dp, 50.dp, 3.5.dp, 0.3f, p4y),
-                Particle((-40).dp, 90.dp, 2.dp, 0.45f, p5y),
-                Particle(60.dp, (-30).dp, 2.5.dp, 0.4f, p6y)
+                Pair((-90).dp to (-60).dp, p1y), Pair(80.dp to (-80).dp, p2y), Pair((-110).dp to 30.dp, p3y),
+                Pair(100.dp to 50.dp, p4y), Pair((-40).dp to 90.dp, p5y), Pair(60.dp to (-30).dp, p6y)
             )
-
-            particles.forEach { p ->
-                Box(
-                    modifier = Modifier
-                        .offset(x = p.x, y = p.yBase + p.dy.dp)
-                        .size(p.size)
-                        .background(
-                            color = Color(0xFFA288E3).copy(alpha = p.colorAlpha),
-                            shape = androidx.compose.foundation.shape.CircleShape
-                        )
-                )
+            particles.forEach { (offsets, dy) ->
+                Box(modifier = Modifier.offset(x = offsets.first, y = offsets.second + dy.dp).size(3.dp).background(Color(0xFFA288E3).copy(0.4f), CircleShape))
             }
-
-            // Two gold accent particles
-            Box(
-                modifier = Modifier
-                    .offset(x = (-70).dp, y = 70.dp + p2y.dp)
-                    .size(2.dp)
-                    .background(
-                        color = Color(0xFFE5C158).copy(alpha = 0.5f),
-                        shape = androidx.compose.foundation.shape.CircleShape
-                    )
-            )
-            Box(
-                modifier = Modifier
-                    .offset(x = 85.dp, y = (-55).dp + p4y.dp)
-                    .size(2.dp)
-                    .background(
-                        color = Color(0xFFE5C158).copy(alpha = 0.45f),
-                        shape = androidx.compose.foundation.shape.CircleShape
-                    )
-            )
         }
 
-        // ── LAYER 5: Diagonal scan line ───────────────────────────────────────
-        Canvas(
-            modifier = Modifier
-                .size(320.dp, 200.dp)
-                .graphicsLayer(alpha = 0.06f)
-        ) {
-            drawLine(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        Color.White,
-                        Color.Transparent
-                    )
-                ),
-                start = Offset(scanLine - 100f, 0f),
-                end = Offset(scanLine + 100f, size.height),
-                strokeWidth = 1.5f
-            )
+        // LAYER 5: Scan Line
+        Canvas(modifier = Modifier.size(320.dp, 200.dp).graphicsLayer(alpha = 0.06f)) {
+            drawLine(Brush.linearGradient(listOf(Color.Transparent, Color.White, Color.Transparent)), Offset(scanLine - 100f, 0f), Offset(scanLine + 100f, size.height), 1.5f)
         }
 
-        // ── LAYER 6: Four corner accent lines ─────────────────────────────────
+        // LAYER 6: Corner Accents
         if (startAnimation) {
-            val cornerAlpha by animateFloatAsState(
-                targetValue = 0.3f,
-                animationSpec = tween(1200, delayMillis = 400),
-                label = "cornerAlpha"
-            )
+            val cornerAlpha by animateFloatAsState(0.3f, tween(1200, 400), label = "corner")
             Canvas(modifier = Modifier.size(280.dp).graphicsLayer(alpha = cornerAlpha)) {
-                val w = size.width
-                val h = size.height
-                val len = 28f
-                val strokeW = 1f
-                val col = Color(0xFFE5C158)
-                // Top-left
-                drawLine(col, Offset(0f, 0f), Offset(len, 0f), strokeW)
-                drawLine(col, Offset(0f, 0f), Offset(0f, len), strokeW)
-                // Top-right
-                drawLine(col, Offset(w, 0f), Offset(w - len, 0f), strokeW)
-                drawLine(col, Offset(w, 0f), Offset(w, len), strokeW)
-                // Bottom-left
-                drawLine(col, Offset(0f, h), Offset(len, h), strokeW)
-                drawLine(col, Offset(0f, h), Offset(0f, h - len), strokeW)
-                // Bottom-right
-                drawLine(col, Offset(w, h), Offset(w - len, h), strokeW)
-                drawLine(col, Offset(w, h), Offset(w, h - len), strokeW)
+                val len = 28f; val col = Color(0xFFE5C158)
+                drawLine(col, Offset(0f, 0f), Offset(len, 0f), 1f) // Top-Left
+                drawLine(col, Offset(0f, 0f), Offset(0f, len), 1f)
+                drawLine(col, Offset(size.width, 0f), Offset(size.width - len, 0f), 1f) // Top-Right
+                drawLine(col, Offset(size.width, size.height), Offset(size.width, size.height - len), 1f) // Bottom-Right
             }
         }
 
-        // ── LAYER 7: The original logo + tagline (UNCHANGED) ──────────────────
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.scale(scale).graphicsLayer(alpha = alpha)
-        ) {
+        // LAYER 7: Branding
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.scale(scale).graphicsLayer(alpha = alpha)) {
             Box {
-                Text(
-                    text = "expectr",
-                    color = Color.White.copy(alpha = 0.1f),
-                    fontSize = 54.sp,
-                    fontWeight = FontWeight.ExtraLight,
-                    letterSpacing = (-2).sp
-                )
-                Text(
-                    text = "expectr",
-                    fontSize = 54.sp,
-                    fontWeight = FontWeight.ExtraLight,
-                    letterSpacing = (-2).sp,
-                    style = androidx.compose.ui.text.TextStyle(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.White.copy(alpha = 0.8f),
-                                Color.Transparent
-                            ),
-                            start = Offset(shimmerOffset - 200f, shimmerOffset - 200f),
-                            end = Offset(shimmerOffset, shimmerOffset)
-                        )
-                    )
-                )
+                Text("expectr", color = Color.White.copy(0.1f), fontSize = 54.sp, fontWeight = FontWeight.ExtraLight, letterSpacing = (-2).sp)
+                Text("expectr", fontSize = 54.sp, fontWeight = FontWeight.ExtraLight, letterSpacing = (-2).sp,
+                    style = androidx.compose.ui.text.TextStyle(brush = Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(0.8f), Color.Transparent),
+                        start = Offset(shimmerOffset - 200f, shimmerOffset - 200f), end = Offset(shimmerOffset, shimmerOffset))))
             }
-
             Spacer(modifier = Modifier.height(12.dp))
-
-            AnimatedVisibility(
-                visible = startAnimation,
-                enter = fadeIn(animationSpec = tween(1000, delayMillis = 500)) +
-                        expandVertically(animationSpec = tween(1000, delayMillis = 500))
-            ) {
-                Text(
-                    text = "FINANCIAL INTELLIGENCE",
-                    color = Color(0xFFE5C158).copy(alpha = 0.7f),
-                    fontSize = 11.sp,
-                    letterSpacing = 5.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            AnimatedVisibility(visible = startAnimation, enter = fadeIn(tween(1000, 500)) + expandVertically(tween(1000, 500))) {
+                Text("FINANCIAL INTELLIGENCE", color = Color(0xFFE5C158).copy(0.7f), fontSize = 11.sp, letterSpacing = 5.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-fun AppNavigation(viewModel: HomeViewModel) {
+fun AppNavigation(viewModel: HomeViewModel, startRoute: String) {
     val navController = rememberNavController()
-
-    // Helper for Bottom Nav logic
     val navTo = { route: String ->
-        val currentRoute = navController.currentBackStackEntry?.destination?.route
-        if (currentRoute != route) {
+        if (navController.currentBackStackEntry?.destination?.route != route) {
             navController.navigate(route) {
-                navController.graph.startDestinationRoute?.let { startRoute ->
-                    popUpTo(startRoute) { saveState = true }
-                }
-                launchSingleTop = true
-                restoreState = true
+                navController.graph.startDestinationRoute?.let { popUpTo(it) { saveState = true } }
+                launchSingleTop = true; restoreState = true
             }
         }
     }
 
-    NavHost(navController = navController, startDestination = "home") {
-        composable("home") {
-            HomeScreen(
-                viewModel = viewModel,
-                onScoreClick = { navController.navigate("score") },
-                onAddClick = { navTo("add_transaction") },
-                onTxnsClick = { navTo("transactions") },
-                onInsightsClick = { navTo("insights") },
-                onScoreNavClick = { navTo("score") }
-            )
-        }
-
-        composable("transactions") {
-            TransactionsScreen(
-                viewModel = viewModel,
-                onNavigateHome = { navTo("home") },
-                onNavigateAdd = { navTo("add_transaction") }
-            )
-        }
-
-        composable("insights") {
-            InsightsScreen(
-                viewModel = viewModel,
-                onNavigateHome = { navTo("home") },
-                onNavigateTxns = { navTo("transactions") },
-                onNavigateAdd = { navTo("add_transaction") }
-            )
-        }
-
-        composable("score") {
-            ScoreScreen(
-                viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateHome = { navTo("home") },
-                onNavigateTxns = { navTo("transactions") },
-                onNavigateAdd = { navTo("add_transaction") },
-                onNavigateInsights = { navTo("insights") }
-            )
-        }
-
-        composable("add_transaction") {
-            AddTransactionScreen(
-                viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
+    NavHost(navController = navController, startDestination = startRoute) {
+        composable("home") { HomeScreen(viewModel, onScoreClick = { navController.navigate("score") }, onAddClick = { navTo("add_transaction") }, onTxnsClick = { navTo("transactions") }, onInsightsClick = { navTo("insights") }, onScoreNavClick = { navTo("score") }) }
+        composable("transactions") { TransactionsScreen(viewModel, onNavigateHome = { navTo("home") }, onNavigateAdd = { navTo("add_transaction") }) }
+        composable("insights") { InsightsScreen(viewModel, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }) }
+        composable("score") { ScoreScreen(viewModel, onNavigateBack = { navController.popBackStack() }, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }, onNavigateInsights = { navTo("insights") }) }
+        composable("add_transaction") { AddTransactionScreen(viewModel, onNavigateBack = { navController.popBackStack() }) }
     }
 }

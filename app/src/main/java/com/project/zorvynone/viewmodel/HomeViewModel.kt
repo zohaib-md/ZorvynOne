@@ -29,7 +29,7 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
     val totalIncome: StateFlow<Int> = dao.getTotalIncome().map { it ?: 0 }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    val totalExpenses: StateFlow<Int> = dao.getTotalExpense().map { it ?: 0 }
+    val totalExpenses: StateFlow<Int> = dao.getTotalExpenses().map { it ?: 0 }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val totalBalance: StateFlow<Int> = dao.getAllTransactions().map { list ->
