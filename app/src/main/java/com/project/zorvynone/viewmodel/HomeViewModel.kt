@@ -74,6 +74,121 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
     }
 
     // ==========================================
+    //      MAGIC RECEIPT SCANNER INTEGRATION
+    // ==========================================
+
+    private val _isScannerLoading = MutableStateFlow(false)
+    val isScannerLoading: StateFlow<Boolean> = _isScannerLoading.asStateFlow()
+
+    fun processReceiptText(rawReceiptText: String, apiKey: String) {
+        if (_isScannerLoading.value) return
+
+        viewModelScope.launch {
+            _isScannerLoading.value = true
+            try {
+                // 1. Upgraded Prompt: Forces rounded integers and strict JSON formatting
+                val prompt = """
+                    You are a financial AI data extractor. I have scanned a receipt using OCR. The raw text is below:
+                    
+                    "$rawReceiptText"
+                    
+                    Extract the primary transaction details and return ONLY a valid JSON object. DO NOT include markdown, backticks, or any conversational text.
+                    
+                    Rules:
+                    1. amount: Integer (Find the 'Total'. If it has decimals like 45.99, round it to 46. Return ONLY the number).
+                    2. title: String (Identify the merchant name).
+                    3. isIncome: Boolean (Always false).
+                    4. category: String (Choose exactly one: "Food", "Transport", "Shopping", "Housing", "Miscellaneous").
+                    5. iconType: String (Choose exactly one: "FOOD", "TRANSPORT", "SHOPPING", "HOUSING", "DEFAULT").
+                    
+                    Example Output:
+                    {
+                      "title": "Starbucks Coffee",
+                      "amount": 350,
+                      "isIncome": false,
+                      "category": "Food",
+                      "iconType": "FOOD"
+                    }
+                """.trimIndent()
+
+                val result = withContext(Dispatchers.IO) {
+                    val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
+                    val connection = url.openConnection() as java.net.HttpURLConnection
+                    connection.requestMethod = "POST"
+                    connection.setRequestProperty("Content-Type", "application/json")
+                    connection.doOutput = true
+                    connection.connectTimeout = 15000
+                    connection.readTimeout = 15000
+
+                    val requestBody = JSONObject().apply {
+                        put("contents", JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("parts", JSONArray().apply {
+                                    put(JSONObject().apply {
+                                        put("text", prompt)
+                                    })
+                                })
+                            })
+                        })
+                    }.toString()
+
+                    connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+                    val responseCode = connection.responseCode
+                    if (responseCode == 200) {
+                        connection.inputStream.bufferedReader().readText()
+                    } else {
+                        val errorText = connection.errorStream?.bufferedReader()?.readText() ?: "Unknown error"
+                        throw Exception("API Error $responseCode: $errorText")
+                    }
+                }
+
+                val responseJson = JSONObject(result)
+                var text = responseJson.getJSONArray("candidates")
+                    .getJSONObject(0).getJSONObject("content")
+                    .getJSONArray("parts").getJSONObject(0).getString("text")
+
+                // 2. Safely extract ONLY the JSON block (ignores any conversational text Gemini might add)
+                val startIndex = text.indexOf('{')
+                val endIndex = text.lastIndexOf('}')
+                if (startIndex != -1 && endIndex != -1) {
+                    text = text.substring(startIndex, endIndex + 1)
+                }
+
+                val txnJson = JSONObject(text)
+
+                val categoryStr = txnJson.getString("category")
+                val dateMillis = System.currentTimeMillis()
+                val dateString = SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(dateMillis))
+                val finalSubtitle = "AI Scanned • $dateString"
+
+                // 3. Safe Double-to-Int conversion (Prevents crash if Gemini returns 450.50)
+                val safeAmount = txnJson.optDouble("amount", 0.0).toInt()
+
+                val newTxn = Transaction(
+                    title = txnJson.getString("title"),
+                    subtitle = finalSubtitle,
+                    amount = safeAmount,
+                    isIncome = txnJson.optBoolean("isIncome", false),
+                    category = categoryStr,
+                    date = dateMillis,
+                    note = "Scanned Receipt via ML Kit",
+                    iconType = IconType.valueOf(txnJson.getString("iconType"))
+                )
+
+                dao.insertTransaction(newTxn)
+
+            } catch (e: Exception) {
+                // If it fails, print the exact error to Android Studio Logcat so we can see it!
+                println("ZORVYN_SCANNER_ERROR: ${e.message}")
+                e.printStackTrace()
+            } finally {
+                _isScannerLoading.value = false
+            }
+        }
+    }
+
+    // ==========================================
     //       VOICE AI ASSISTANT INTEGRATION
     // ==========================================
 
@@ -86,7 +201,6 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
         viewModelScope.launch {
             _isVoiceLoading.value = true
             try {
-                // We force Gemini to output strict JSON
                 val prompt = """
                     You are a financial AI assistant. The user just said: "$spokenText".
                     Extract the transaction details and return ONLY a valid JSON object. Do not include markdown formatting, backticks, or the word "json".
@@ -140,7 +254,6 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
                     }
                 }
 
-                // 1. Parse Gemini's standard response wrapper
                 val responseJson = JSONObject(result)
                 var text = responseJson
                     .getJSONArray("candidates")
@@ -150,10 +263,8 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
                     .getJSONObject(0)
                     .getString("text")
 
-                // 2. Clean the string (Gemini sometimes adds ```json ... ``` markdown despite our prompt)
                 text = text.replace("```json", "").replace("```", "").trim()
 
-                // 3. Parse our generated JSON object
                 val txnJson = JSONObject(text)
 
                 val categoryStr = txnJson.getString("category")
@@ -173,7 +284,6 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
                     iconType = IconType.valueOf(txnJson.getString("iconType"))
                 )
 
-                // 4. Save directly to the database
                 dao.insertTransaction(newTxn)
 
             } catch (e: Exception) {

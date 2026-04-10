@@ -1,10 +1,18 @@
 package com.project.zorvynone.ui.screens
 
+import android.content.Intent
+import android.net.Uri
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -27,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -35,19 +44,18 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.project.zorvynone.ui.theme.*
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.project.zorvynone.model.IconType
 import com.project.zorvynone.model.Transaction
+import com.project.zorvynone.ui.theme.*
 import com.project.zorvynone.viewmodel.HomeViewModel
 import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.abs
-import android.content.Intent
-import android.speech.RecognizerIntent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 
-// --- NEW GLOBAL SHIMMER BRUSH ---
+// --- GLOBAL SHIMMER BRUSH ---
 @Composable
 fun premiumShimmerBrush(): Brush {
     val shimmerColors = listOf(
@@ -91,30 +99,48 @@ fun HomeScreen(
     val isAiLoading by viewModel.isAiLoading.collectAsStateWithLifecycle()
 
     val isVoiceLoading by viewModel.isVoiceLoading.collectAsStateWithLifecycle()
+    val isScannerLoading by viewModel.isScannerLoading.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
-    // --- NEW: NATIVE SPEECH RECOGNIZER LAUNCHER ---
     val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
             if (!spokenText.isNullOrBlank()) {
-                // ⚠️ PASTE YOUR API KEY HERE ⚠️
-                viewModel.processVoiceTransaction(spokenText, "AIzaSyBv5gW1DjAbe0mj65vJlns0pS9sCbNRFEs")
+                viewModel.processVoiceTransaction(spokenText, "AIzaSyC8Ed1CGHWwlRw0oEvedgRwIGL0_ijjcE8")
+            }
+        }
+    }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(PickVisualMedia()) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val image = InputImage.fromFilePath(context, uri)
+                val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+                recognizer.process(image)
+                    .addOnSuccessListener { visionText ->
+                        val extractedText = visionText.text
+                        if (extractedText.isNotBlank()) {
+                            viewModel.processReceiptText(extractedText, "AIzaSyC8Ed1CGHWwlRw0oEvedgRwIGL0_ijjcE8")
+                        }
+                    }
+                    .addOnFailureListener { e -> e.printStackTrace() }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
 
     Scaffold(
         containerColor = ZorvynBackground,
-        // 1. Move it back to the right side (Material Design Standard)
         floatingActionButtonPosition = FabPosition.End,
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                // 2. Add a slight upward offset so it floats elegantly above the nav bar
                 modifier = Modifier.offset(y = (-16).dp),
                 onClick = {
                     val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Say a transaction (e.g., 'I spent ₹450 on a cab')")
+                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Say a transaction")
                     }
                     speechLauncher.launch(intent)
                 },
@@ -130,7 +156,6 @@ fun HomeScreen(
                     Icon(Icons.Default.Mic, contentDescription = "Voice Assistant", modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Voice AI", fontWeight = FontWeight.Bold, fontSize = 14.sp, letterSpacing = 0.5.sp)
-                    // (I also shortened the text slightly to "Voice AI" so it doesn't block too much screen space!)
                 }
             }
         },
@@ -146,7 +171,6 @@ fun HomeScreen(
             )
         }
     ) { paddingValues ->
-        // ... The rest of your HomeScreen code stays exactly the same ...->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -155,7 +179,7 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(modifier = Modifier.height(16.dp))
-            ZorvynOneBranding()
+            ExpectrBranding() // REBRANDED COMPONENT
             Spacer(modifier = Modifier.height(24.dp))
             PremiumHomeHeader()
             Spacer(modifier = Modifier.height(32.dp))
@@ -170,27 +194,40 @@ fun HomeScreen(
                 insights = aiInsights,
                 isLoading = isAiLoading,
                 onGenerateClick = {
-                    viewModel.generateInsights("AIzaSyBv5gW1DjAbe0mj65vJlns0pS9sCbNRFEs")
+                    viewModel.generateInsights("AIzaSyC8Ed1CGHWwlRw0oEvedgRwIGL0_ijjcE8")
+                }
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+
+            PremiumScannerCard(
+                isLoading = isScannerLoading,
+                onClick = {
+                    photoPickerLauncher.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
                 }
             )
             Spacer(modifier = Modifier.height(32.dp))
 
             RecentTransactionsSection(transactions = transactions, onDelete = { txn -> viewModel.deleteTransaction(txn) })
-            Spacer(modifier = Modifier.height(80.dp)) // Added extra padding so the list isn't hidden behind the FAB
+            Spacer(modifier = Modifier.height(80.dp))
         }
     }
 }
 
 @Composable
-fun ZorvynOneBranding() {
+fun ExpectrBranding() {
     val premiumGold = Color(0xFFE5C158)
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(buildAnnotatedString {
-            withStyle(SpanStyle(color = TextPrimary, fontWeight = FontWeight.Black)) { append("ZORVYN") }
-            withStyle(SpanStyle(color = premiumGold, fontWeight = FontWeight.Black)) { append("ONE") }
-        }, fontSize = 20.sp, letterSpacing = 2.sp)
+        // NEW LOGO FORMAT: lowercase 'expectr'
+        Text(
+            text = "expectr",
+            color = TextPrimary,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = (-1).sp
+        )
+
         Box(modifier = Modifier.size(40.dp).background(Color(0xFF1C2238), CircleShape).border(1.dp, TextSecondary.copy(alpha = 0.2f), CircleShape), contentAlignment = Alignment.Center) {
-            Text("U", color = premiumGold, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("U", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
     }
 }
@@ -223,9 +260,26 @@ fun PremiumHomeHeader() {
 
 @Composable
 fun PremiumBalanceCard(balance: Int, income: Int, expense: Int) {
+    val animatedBalance by animateIntAsState(
+        targetValue = balance,
+        animationSpec = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+        label = "balanceAnim"
+    )
+    val animatedIncome by animateIntAsState(
+        targetValue = income,
+        animationSpec = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+        label = "incomeAnim"
+    )
+    val animatedExpense by animateIntAsState(
+        targetValue = expense,
+        animationSpec = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+        label = "expenseAnim"
+    )
+
     val formatter = NumberFormat.getNumberInstance(Locale("en", "IN"))
     val cardBg = Color(0xFF1C2238)
     val cardBorder = Color(0xFF2A314A)
+
     val savingsRate = if (income > 0) ((income - expense).toFloat() / income.toFloat() * 100).toInt() else 0
     val isPositive = savingsRate >= 0
     val displayRate = abs(savingsRate)
@@ -235,7 +289,7 @@ fun PremiumBalanceCard(balance: Int, income: Int, expense: Int) {
             Text("TOTAL BALANCE", color = TextSecondary.copy(alpha = 0.8f), fontSize = 12.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.Bottom) {
-                Text("₹${formatter.format(balance)}", color = TextPrimary, fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp)
+                Text("₹${formatter.format(animatedBalance)}", color = TextPrimary, fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp)
                 Text(".00", color = TextSecondary.copy(alpha = 0.6f), fontSize = 20.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 6.dp))
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -259,8 +313,8 @@ fun PremiumBalanceCard(balance: Int, income: Int, expense: Int) {
             }
             Spacer(modifier = Modifier.height(24.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                PremiumStatBox(modifier = Modifier.weight(1f), title = "INCOME", amount = "₹${formatter.format(income)}", isIncome = true)
-                PremiumStatBox(modifier = Modifier.weight(1f), title = "EXPENSES", amount = "₹${formatter.format(expense)}", isIncome = false)
+                PremiumStatBox(modifier = Modifier.weight(1f), title = "INCOME", amount = "₹${formatter.format(animatedIncome)}", isIncome = true)
+                PremiumStatBox(modifier = Modifier.weight(1f), title = "EXPENSES", amount = "₹${formatter.format(animatedExpense)}", isIncome = false)
             }
         }
     }
@@ -289,20 +343,52 @@ fun PremiumStatBox(modifier: Modifier = Modifier, title: String, amount: String,
 @Composable
 fun PremiumCredScoreCard(score: Int, onClick: () -> Unit = {}) {
     val premiumGold = Color(0xFFE5C158)
-    val statusText = when { score >= 90 -> "Excellent"; score >= 74 -> "Good Standing"; score >= 50 -> "Fair"; else -> "Needs Attention" }
-    val statusColor = when { score >= 90 -> ZorvynGreen; score >= 74 -> premiumGold; score >= 50 -> Color(0xFFF59E0B); else -> ZorvynRed }
-    val rankMock = when { score >= 90 -> "Top 2% of all users"; score >= 80 -> "Top 15% of all users"; score >= 70 -> "Top 40% of all users"; else -> "Below average" }
+    val statusText = when {
+        score >= 90 -> "Excellent"
+        score >= 74 -> "Good Standing"
+        score >= 50 -> "Fair"
+        else -> "Needs Attention"
+    }
 
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = ZorvynSurface), border = BorderStroke(1.dp, statusColor.copy(alpha = 0.15f))) {
+    val statusColor = when {
+        score >= 90 -> ZorvynGreen
+        score >= 74 -> premiumGold
+        score >= 50 -> Color(0xFFF59E0B)
+        else -> ZorvynRed
+    }
+
+    val rankMock = when {
+        score >= 90 -> "Elite Financial Discipline"
+        score >= 80 -> "High Discipline Tier"
+        score >= 70 -> "Stable Saving Habit"
+        score >= 50 -> "Developing Foundation"
+        else -> "High Risk Profile"
+    }
+
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = ZorvynSurface),
+        border = BorderStroke(1.dp, statusColor.copy(alpha = 0.15f))
+    ) {
         Row(modifier = Modifier.padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(70.dp)) {
                 val animatedProgress by animateFloatAsState(targetValue = score / 100f, animationSpec = tween(1000), label = "progress")
-                CircularProgressIndicator(progress = { animatedProgress }, modifier = Modifier.fillMaxSize(), color = premiumGold, trackColor = TextSecondary.copy(alpha = 0.1f), strokeWidth = 5.dp, strokeCap = StrokeCap.Round)
+                CircularProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.fillMaxSize(),
+                    color = premiumGold,
+                    trackColor = TextSecondary.copy(alpha = 0.1f),
+                    strokeWidth = 5.dp,
+                    strokeCap = StrokeCap.Round
+                )
                 Text("$score", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 22.sp)
             }
             Spacer(modifier = Modifier.width(20.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("ZORVYN SCORE", color = TextSecondary.copy(alpha = 0.7f), fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                // UPDATED NAME
+                Text("EXPECTR SCORE", color = TextSecondary.copy(alpha = 0.7f), fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text("$score", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
@@ -356,7 +442,6 @@ fun PremiumAiInsightsSection(
         Card(colors = CardDefaults.cardColors(containerColor = ZorvynSurface), border = BorderStroke(1.dp, TextSecondary.copy(alpha = 0.1f)), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 if (isLoading) {
-                    // NEW: SHIMMER EFFECT FOR AI INSIGHTS
                     Column(modifier = Modifier.fillMaxWidth()) {
                         repeat(3) { index ->
                             Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
@@ -388,6 +473,45 @@ fun PremiumAiInsightsSection(
                         if (index < insights.size - 1 && index < 2) { HorizontalDivider(color = TextSecondary.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 16.dp)) }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun PremiumScannerCard(isLoading: Boolean, onClick: () -> Unit) {
+    val premiumGold = Color(0xFFE5C158)
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(enabled = !isLoading) { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C2238)),
+        border = BorderStroke(1.dp, premiumGold.copy(alpha = 0.3f))
+    ) {
+        Row(
+            modifier = Modifier.padding(20.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(48.dp).background(premiumGold.copy(alpha = 0.1f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(color = premiumGold, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.DocumentScanner, contentDescription = "Scan", tint = premiumGold)
+                    }
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text("Magic Receipt Scanner", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(if (isLoading) "Extracting data with ML Kit..." else "Upload an image to auto-fill", color = TextSecondary.copy(alpha = 0.8f), fontSize = 13.sp)
+                }
+            }
+            if (!isLoading) {
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextSecondary.copy(alpha = 0.5f))
             }
         }
     }
@@ -461,13 +585,44 @@ fun SwipeableTransactionItem(txn: Transaction, onDelete: () -> Unit) {
 
 @Composable
 fun TransactionItem(icon: ImageVector, iconTint: Color, title: String, subtitle: String, amount: String, isIncome: Boolean) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(48.dp).background(iconTint.copy(alpha = 0.1f), RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) { Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(24.dp)) }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(48.dp).background(iconTint.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(24.dp))
+            }
             Spacer(modifier = Modifier.width(16.dp))
-            Column { Text(title, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold); Spacer(modifier = Modifier.height(2.dp)); Text(subtitle, color = TextSecondary.copy(alpha = 0.8f), fontSize = 13.sp) }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(subtitle, color = TextSecondary.copy(alpha = 0.8f), fontSize = 13.sp)
+            }
         }
-        Text(amount, color = if (isIncome) ZorvynGreen else ZorvynRed, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Text(
+            text = amount,
+            color = if (isIncome) ZorvynGreen else ZorvynRed,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 

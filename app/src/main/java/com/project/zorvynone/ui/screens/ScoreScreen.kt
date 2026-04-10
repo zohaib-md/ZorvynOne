@@ -40,7 +40,6 @@ data class ScoreHabit(
     val acceptText: String, val rejectText: String
 )
 
-// --- GLOBAL SHIMMER BRUSH IMPORTED FOR SCORE SCREEN ---
 @Composable
 fun scoreShimmerBrush(): Brush {
     val shimmerColors = listOf(Color.White.copy(alpha = 0.03f), Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.03f))
@@ -98,12 +97,14 @@ fun ScoreScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text(text = "ZORVYN HEALTH SCORE", color = TextSecondary.copy(alpha = 0.7f), fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                // REBRANDED HEADER
+                Text(text = "EXPECTR HEALTH SCORE", color = TextSecondary.copy(alpha = 0.7f), fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(buildAnnotatedString { withStyle(SpanStyle(color = TextPrimary)) { append("The Score You\n") }; withStyle(SpanStyle(color = premiumGold)) { append("Control.") } }, fontSize = 42.sp, fontWeight = FontWeight.Black, lineHeight = 44.sp, letterSpacing = (-1.5).sp)
             }
             Spacer(modifier = Modifier.height(20.dp))
-            Text(text = "Unlike traditional bureau scores, your Zorvyn Score reacts instantly to your income, expenses and financial discipline.", color = TextSecondary.copy(alpha = 0.7f), fontSize = 15.sp, lineHeight = 22.sp)
+            // UPDATED COPY
+            Text(text = "Unlike traditional bureau scores, your expectr Score reacts instantly to your income, expenses and financial discipline.", color = TextSecondary.copy(alpha = 0.7f), fontSize = 15.sp, lineHeight = 22.sp)
             Spacer(modifier = Modifier.height(32.dp))
 
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = ZorvynSurface), border = BorderStroke(1.dp, TextSecondary.copy(alpha = 0.15f))) {
@@ -146,7 +147,6 @@ fun ScoreScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             if (selectedTab == "Spending") {
-                // NEW: SHIMMER SKELETON LOADERS
                 if (isScoreLoading) {
                     repeat(2) {
                         ShimmerHabitCard()
@@ -167,7 +167,7 @@ fun ScoreScreen(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("Tap below to generate a personalized AI plan.", color = TextSecondary, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF2A2045), RoundedCornerShape(12.dp)).clickable(enabled = !isScoreLoading) { viewModel.generateScoreHabits("AIzaSyBv5gW1DjAbe0mj65vJlns0pS9sCbNRFEs") }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF2A2045), RoundedCornerShape(12.dp)).clickable(enabled = !isScoreLoading) { viewModel.generateScoreHabits("AIzaSyC8Ed1CGHWwlRw0oEvedgRwIGL0_ijjcE8") }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.AutoAwesome, contentDescription = "AI", tint = Color(0xFFA288E3), modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
@@ -199,7 +199,6 @@ fun ScoreScreen(
     }
 }
 
-// --- NEW SHIMMER SKELETON CARD ---
 @Composable
 fun ShimmerHabitCard() {
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = ZorvynSurface), shape = RoundedCornerShape(20.dp)) {
