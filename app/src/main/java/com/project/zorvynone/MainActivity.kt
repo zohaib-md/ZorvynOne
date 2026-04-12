@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -32,10 +31,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.google.firebase.auth.FirebaseAuth
 import com.project.zorvynone.model.AppDatabase
+import com.project.zorvynone.model.AuthPrefs
 import com.project.zorvynone.ui.screens.*
 import com.project.zorvynone.ui.theme.ZorvynBackground
 import com.project.zorvynone.ui.theme.ZorvynOneTheme
+import com.project.zorvynone.viewmodel.AuthViewModel
 import com.project.zorvynone.viewmodel.HomeViewModel
 import kotlinx.coroutines.delay
 
@@ -46,9 +48,22 @@ class MainActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
 
-        // 2. Deep Link Check: Did the user tap the Widget '+'?
+        // 2. Auth & Deep Link Check — Firebase is now source of truth
+        val authPrefs = AuthPrefs(applicationContext)
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
         val navTarget = intent.getStringExtra("nav")
-        val initialRoute = if (navTarget == "add") "add_transaction" else "home"
+        val initialRoute = when {
+            firebaseUser == null -> "login"
+            navTarget == "add" -> "add_transaction"
+            else -> "home"
+        }
+
+        // Sync AuthPrefs with Firebase state (for widget compat)
+        if (firebaseUser != null) {
+            authPrefs.isLoggedIn = true
+            authPrefs.email = firebaseUser.email ?: ""
+            authPrefs.username = firebaseUser.displayName ?: ""
+        }
 
         val db = AppDatabase.getDatabase(applicationContext)
         val factory = object : ViewModelProvider.Factory {
@@ -66,11 +81,16 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = ZorvynBackground
                 ) {
-                    val viewModel: HomeViewModel = viewModel(factory = factory)
+                    val homeViewModel: HomeViewModel = viewModel(factory = factory)
+                    val authViewModel: AuthViewModel = viewModel()
 
                     if (showMainContent) {
-                        // Land on the correct screen based on the entry point
-                        AppNavigation(viewModel = viewModel, startRoute = initialRoute)
+                        AppNavigation(
+                            homeViewModel = homeViewModel,
+                            authViewModel = authViewModel,
+                            startRoute = initialRoute,
+                            authPrefs = authPrefs
+                        )
                     } else {
                         ExpectrAnimatedSplash(onAnimFinished = { showMainContent = true })
                     }
@@ -195,7 +215,12 @@ fun ExpectrAnimatedSplash(onAnimFinished: () -> Unit) {
 }
 
 @Composable
-fun AppNavigation(viewModel: HomeViewModel, startRoute: String) {
+fun AppNavigation(
+    homeViewModel: HomeViewModel,
+    authViewModel: AuthViewModel,
+    startRoute: String,
+    authPrefs: AuthPrefs
+) {
     val navController = rememberNavController()
     val navTo = { route: String ->
         if (navController.currentBackStackEntry?.destination?.route != route) {
@@ -207,10 +232,56 @@ fun AppNavigation(viewModel: HomeViewModel, startRoute: String) {
     }
 
     NavHost(navController = navController, startDestination = startRoute) {
-        composable("home") { HomeScreen(viewModel, onScoreClick = { navController.navigate("score") }, onAddClick = { navTo("add_transaction") }, onTxnsClick = { navTo("transactions") }, onInsightsClick = { navTo("insights") }, onScoreNavClick = { navTo("score") }) }
-        composable("transactions") { TransactionsScreen(viewModel, onNavigateHome = { navTo("home") }, onNavigateAdd = { navTo("add_transaction") }) }
-        composable("insights") { InsightsScreen(viewModel, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }) }
-        composable("score") { ScoreScreen(viewModel, onNavigateBack = { navController.popBackStack() }, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }, onNavigateInsights = { navTo("insights") }) }
-        composable("add_transaction") { AddTransactionScreen(viewModel, onNavigateBack = { navController.popBackStack() }) }
+        composable("login") {
+            LoginScreen(
+                authViewModel = authViewModel,
+                onLoginSuccess = { email ->
+                    // Sync AuthPrefs for widget + offline compat
+                    authPrefs.isLoggedIn = true
+                    authPrefs.email = email
+                    authPrefs.username = FirebaseAuth.getInstance().currentUser?.displayName ?: ""
+                    navController.navigate("home") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                },
+                onNavigateToSignUp = { navController.navigate("signup") }
+            )
+        }
+        composable("signup") {
+            SignUpScreen(
+                authViewModel = authViewModel,
+                onRegisterSuccess = { username, email ->
+                    // Sync AuthPrefs for widget + offline compat
+                    authPrefs.isLoggedIn = true
+                    authPrefs.username = username
+                    authPrefs.email = email
+                    navController.navigate("home") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                },
+                onNavigateToLogin = { navController.popBackStack() }
+            )
+        }
+        composable("home") {
+            HomeScreen(
+                viewModel = homeViewModel,
+                onScoreClick = { navController.navigate("score") },
+                onAddClick = { navTo("add_transaction") },
+                onTxnsClick = { navTo("transactions") },
+                onInsightsClick = { navTo("insights") },
+                onScoreNavClick = { navTo("score") },
+                onSignOut = {
+                    authViewModel.signOut()
+                    authPrefs.logout()
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable("transactions") { TransactionsScreen(homeViewModel, onNavigateHome = { navTo("home") }, onNavigateAdd = { navTo("add_transaction") }) }
+        composable("insights") { InsightsScreen(homeViewModel, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }) }
+        composable("score") { ScoreScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }, onNavigateInsights = { navTo("insights") }) }
+        composable("add_transaction") { AddTransactionScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }) }
     }
 }

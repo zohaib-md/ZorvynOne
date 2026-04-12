@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.google.firebase.auth.FirebaseAuth
 import com.project.zorvynone.model.IconType
 import com.project.zorvynone.model.Transaction
 import com.project.zorvynone.ui.theme.*
@@ -87,7 +88,8 @@ fun HomeScreen(
     onAddClick: () -> Unit = {},
     onTxnsClick: () -> Unit = {},
     onInsightsClick: () -> Unit = {},
-    onScoreNavClick: () -> Unit = {}
+    onScoreNavClick: () -> Unit = {},
+    onSignOut: () -> Unit = {}
 ) {
     val balance by viewModel.totalBalance.collectAsStateWithLifecycle()
     val income by viewModel.totalIncome.collectAsStateWithLifecycle()
@@ -180,7 +182,7 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(modifier = Modifier.height(16.dp))
-            ExpectrBranding() // REBRANDED COMPONENT
+            ExpectrBranding(onSignOut = onSignOut)
             Spacer(modifier = Modifier.height(24.dp))
             PremiumHomeHeader()
             Spacer(modifier = Modifier.height(32.dp))
@@ -216,10 +218,18 @@ fun HomeScreen(
 }
 
 @Composable
-fun ExpectrBranding() {
+fun ExpectrBranding(onSignOut: () -> Unit = {}) {
     val premiumGold = Color(0xFFE5C158)
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    val displayName = firebaseUser?.displayName ?: ""
+    val userEmail = firebaseUser?.email ?: ""
+    val initial = displayName.firstOrNull()?.uppercase()
+        ?: userEmail.firstOrNull()?.uppercase()
+        ?: "U"
+
+    var showMenu by remember { mutableStateOf(false) }
+
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        // NEW LOGO FORMAT: lowercase 'expectr'
         Text(
             text = "expectr",
             color = TextPrimary,
@@ -228,8 +238,42 @@ fun ExpectrBranding() {
             letterSpacing = (-1).sp
         )
 
-        Box(modifier = Modifier.size(40.dp).background(Color(0xFF1C2238), CircleShape).border(1.dp, TextSecondary.copy(alpha = 0.2f), CircleShape), contentAlignment = Alignment.Center) {
-            Text("U", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Box {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color(0xFF1C2238), CircleShape)
+                    .border(1.dp, TextSecondary.copy(alpha = 0.2f), CircleShape)
+                    .clickable { showMenu = true },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(initial, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false },
+                containerColor = ZorvynSurface
+            ) {
+                // User info header
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    if (displayName.isNotBlank()) {
+                        Text(displayName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                    Text(userEmail, color = TextSecondary, fontSize = 12.sp)
+                }
+                HorizontalDivider(color = TextSecondary.copy(alpha = 0.15f))
+                DropdownMenuItem(
+                    text = { Text("Sign Out", color = ZorvynRed, fontWeight = FontWeight.Medium) },
+                    onClick = {
+                        showMenu = false
+                        onSignOut()
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.Logout, contentDescription = null, tint = ZorvynRed, modifier = Modifier.size(18.dp))
+                    }
+                )
+            }
         }
     }
 }

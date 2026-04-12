@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "869936454864",
+    "project_id": "zorvynone",
+    "storage_bucket": "zorvynone.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:869936454864:android:2128b0b9c870c52c4652d5",
+        "android_client_info": {
+          "package_name": "com.project.zorvynone"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDnWVBlseVR2nH52HQHOdw4v50kioHzQUw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
