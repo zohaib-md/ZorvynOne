@@ -106,7 +106,7 @@ fun HomeScreen(
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
             if (!spokenText.isNullOrBlank()) {
-                viewModel.processVoiceTransaction(spokenText, "AIzaSyC8Ed1CGHWwlRw0oEvedgRwIGL0_ijjcE8")
+                viewModel.processVoiceTransaction(spokenText, "AIzaSyCQbidjtYufdF4_K79nZFBl8-iU59j9pK8")
             }
         }
     }

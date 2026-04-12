@@ -18,5 +18,23 @@ interface TransactionDao {
     fun getTotalIncome(): Flow<Int?>
 
     @Query("SELECT SUM(amount) FROM transactions WHERE isIncome = 0")
-    fun getTotalExpenses(): Flow<Int?> // Ensure it's plural 'Expenses'
+    fun getTotalExpenses(): Flow<Int?>
+
+    // --- NEW: Savings Engine Queries ---
+    @Query("SELECT * FROM user_profile WHERE id = 0")
+    fun getUserProfile(): Flow<UserFinancialProfile?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProfile(profile: UserFinancialProfile)
+
+    @Query("SELECT * FROM savings_goals")
+    fun getAllGoals(): Flow<List<SavingsGoal>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertGoal(goal: SavingsGoal)
+    @Query("SELECT SUM(amount) FROM transactions WHERE isIncome = 0 AND date >= :startTime")
+    fun getExpensesSince(startTime: Long): Flow<Int?>
+
+    @Query("SELECT SUM(amount) FROM transactions WHERE isIncome = 1 AND date >= :startTime")
+    fun getIncomeSince(startTime: Long): Flow<Int?>
 }
