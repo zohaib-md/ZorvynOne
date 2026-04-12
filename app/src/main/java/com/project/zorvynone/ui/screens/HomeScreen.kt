@@ -97,6 +97,7 @@ fun HomeScreen(
 
     val aiInsights by viewModel.aiInsights.collectAsStateWithLifecycle()
     val isAiLoading by viewModel.isAiLoading.collectAsStateWithLifecycle()
+    val aiError by viewModel.aiInsightsError.collectAsStateWithLifecycle()
 
     val isVoiceLoading by viewModel.isVoiceLoading.collectAsStateWithLifecycle()
     val isScannerLoading by viewModel.isScannerLoading.collectAsStateWithLifecycle()
@@ -106,7 +107,7 @@ fun HomeScreen(
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
             if (!spokenText.isNullOrBlank()) {
-                viewModel.processVoiceTransaction(spokenText, "AIzaSyCQbidjtYufdF4_K79nZFBl8-iU59j9pK8")
+                viewModel.processVoiceTransaction(spokenText)
             }
         }
     }
@@ -121,7 +122,7 @@ fun HomeScreen(
                     .addOnSuccessListener { visionText ->
                         val extractedText = visionText.text
                         if (extractedText.isNotBlank()) {
-                            viewModel.processReceiptText(extractedText, "AIzaSyC8Ed1CGHWwlRw0oEvedgRwIGL0_ijjcE8")
+                            viewModel.processReceiptText(extractedText)
                         }
                     }
                     .addOnFailureListener { e -> e.printStackTrace() }
@@ -193,8 +194,9 @@ fun HomeScreen(
             PremiumAiInsightsSection(
                 insights = aiInsights,
                 isLoading = isAiLoading,
+                errorMessage = aiError,
                 onGenerateClick = {
-                    viewModel.generateInsights("AIzaSyC8Ed1CGHWwlRw0oEvedgRwIGL0_ijjcE8")
+                    viewModel.generateInsights()
                 }
             )
             Spacer(modifier = Modifier.height(32.dp))
@@ -407,6 +409,7 @@ fun PremiumCredScoreCard(score: Int, onClick: () -> Unit = {}) {
 fun PremiumAiInsightsSection(
     insights: List<String>,
     isLoading: Boolean,
+    errorMessage: String? = null,
     onGenerateClick: () -> Unit
 ) {
     val geminiPurple = Color(0xFFA288E3)
@@ -455,6 +458,18 @@ fun PremiumAiInsightsSection(
                             }
                             if (index < 2) { HorizontalDivider(color = TextSecondary.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 16.dp)) }
                         }
+                    }
+                } else if (errorMessage != null) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(modifier = Modifier.size(64.dp).background(Color(0xFF3A1D27).copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
+                            Box(modifier = Modifier.size(48.dp).background(Color(0xFF3A1D27), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = ZorvynRed, modifier = Modifier.size(24.dp)) }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Something went wrong", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(errorMessage, color = TextSecondary.copy(alpha = 0.7f), fontSize = 13.sp, textAlign = TextAlign.Center, lineHeight = 18.sp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Tap Refresh to try again", color = geminiPurple.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 } else if (insights.isEmpty()) {
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {

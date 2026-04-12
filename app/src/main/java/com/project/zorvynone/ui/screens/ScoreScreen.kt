@@ -93,6 +93,7 @@ fun ScoreScreen(
     val aiData by viewModel.scoreHabits.collectAsStateWithLifecycle()
     val defaultData by viewModel.defaultScoreHabits.collectAsStateWithLifecycle()
     val isScoreLoading by viewModel.isScoreLoading.collectAsStateWithLifecycle()
+    val scoreError by viewModel.scoreError.collectAsStateWithLifecycle()
 
     val habits: List<ScoreHabit> = (aiData.ifEmpty { defaultData }).mapIndexed { index, data ->
         val icon = when(data.category.lowercase(Locale.ROOT)) {
@@ -200,6 +201,19 @@ fun ScoreScreen(
                             Text("Refresh for custom saving pro-tips", color = TextSecondary, fontSize = 13.sp)
                         }
                         if (!isScoreLoading) Icon(Icons.Default.ChevronRight, null, tint = TextSecondary)
+                    }
+
+                    // Error feedback
+                    if (scoreError != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().background(ZorvynRed.copy(alpha = 0.1f), RoundedCornerShape(12.dp)).padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.ErrorOutline, null, tint = ZorvynRed, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(scoreError ?: "", color = ZorvynRed.copy(alpha = 0.9f), fontSize = 13.sp, lineHeight = 18.sp)
+                        }
                     }
                 }
             } else {

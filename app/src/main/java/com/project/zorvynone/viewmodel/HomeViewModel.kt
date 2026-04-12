@@ -1,7 +1,9 @@
 package com.project.zorvynone.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.zorvynone.BuildConfig
 import com.project.zorvynone.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -18,8 +20,8 @@ import org.json.JSONObject
  */
 class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
 
-    // --- SECURE INTERNAL CONFIGURATION ---
-    private val GEMINI_API_KEY = "AIzaSyCQbidjtYufdF4_K79nZFBl8-iU59j9pK8"
+    // --- SECURE CONFIGURATION (from local.properties via BuildConfig) ---
+    private val GEMINI_API_KEY = BuildConfig.GEMINI_API_KEY
 
     // --- CORE DATA FLOWS ---
     val transactions: StateFlow<List<Transaction>> = dao.getAllTransactions()
@@ -147,6 +149,7 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
     fun generateScoreHabits(ignoredKey: String = "") {
         viewModelScope.launch {
             _isScoreLoading.value = true
+            _scoreError.value = null
             try {
                 val expenses = transactions.value.filter { !it.isIncome }
                 val summary = if (expenses.isEmpty()) {
@@ -159,30 +162,43 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
                     I am using 'expectr', a luxury financial app. Analyze these spends:
                     $summary
                     
-                    Return exactly 3 specific saving habits. 
-                    FORMAT RULE: Use ONLY pipe-separated lines. No markdown, no bold, no bullet points.
-                    Format: Category|Title|Description (Include a Pro-Tip)|Points(1-10)|StatAmount|StatLabel|AcceptText|RejectText
+                    Return exactly 3 specific saving habits.
+                    CRITICAL FORMAT RULE: Return ONLY 3 pipe-separated lines with NO other text.
+                    Each line must have exactly 8 fields separated by | (pipe character):
+                    Category|Title|Description|Points(1-10)|StatAmount|StatLabel|AcceptText|RejectText
+                    
+                    Example:
+                    Food|Cut Dining Out|Cook at home 4 days a week to save ₹2000|7|₹3,500|this month|Set Limit|Skip
                 """.trimIndent()
 
                 val result = callGeminiApi(prompt, GEMINI_API_KEY)
+                Log.d("ZorvynAI", "ScoreHabits raw response: $result")
 
                 // Robust Parsing: Strips markdown and conversational fluff
                 val habits = result.lines()
-                    .filter { it.contains("|") }
+                    .map { it.replace("`", "").replace("*", "").trim() }
+                    .filter { it.contains("|") && !it.startsWith("Category") } // skip header rows
                     .mapNotNull { line ->
-                        val cleaned = line.replace("`", "").replace("*", "").trim()
-                        val p = cleaned.split("|").map { it.trim() }
+                        val p = line.split("|").map { it.trim() }
                         if (p.size >= 8) {
                             AiHabitData(p[0], p[1], p[2], p[3].toIntOrNull() ?: 5, p[4], p[5], p[6], p[7])
+                        } else if (p.size >= 3) {
+                            // Partial fallback: at least use category + title + description
+                            AiHabitData(p[0], p.getOrElse(1){"Optimize"}, p.getOrElse(2){"Review this spending area"}, p.getOrElse(3){"5"}.toIntOrNull() ?: 5, p.getOrElse(4){"—"}, p.getOrElse(5){"this month"}, p.getOrElse(6){"Accept"}, p.getOrElse(7){"Skip"})
                         } else null
                     }
                     .take(3)
 
                 if (habits.isNotEmpty()) {
                     _scoreHabits.value = habits
+                    _scoreError.value = null
+                } else {
+                    _scoreError.value = "AI returned an unexpected format. Try again."
+                    Log.w("ZorvynAI", "Parsing produced 0 habits from: $result")
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("ZorvynAI", "generateScoreHabits failed", e)
+                _scoreError.value = "Failed to connect: ${e.message?.take(80)}"
             } finally {
                 _isScoreLoading.value = false
             }
@@ -196,6 +212,12 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
     private val _aiInsights = MutableStateFlow<List<String>>(emptyList())
     val aiInsights = _aiInsights.asStateFlow()
 
+    private val _aiInsightsError = MutableStateFlow<String?>(null)
+    val aiInsightsError = _aiInsightsError.asStateFlow()
+
+    private val _scoreError = MutableStateFlow<String?>(null)
+    val scoreError = _scoreError.asStateFlow()
+
     private val _isVoiceLoading = MutableStateFlow(false)
     val isVoiceLoading = _isVoiceLoading.asStateFlow()
 
@@ -205,11 +227,80 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
     fun generateInsights(ignoredKey: String = "") {
         viewModelScope.launch {
             _isAiLoading.value = true
+            _aiInsightsError.value = null
             try {
-                val summary = transactions.value.joinToString { "${it.title}: ₹${it.amount}" }
-                val res = callGeminiApi("Provide 3 financial insights for: $summary. Return as dash-separated list.", GEMINI_API_KEY)
-                _aiInsights.value = res.lines().filter { it.contains("-") }.map { it.trim().removePrefix("-").trim() }
-            } catch (e: Exception) { e.printStackTrace() } finally { _isAiLoading.value = false }
+                val allTxns = transactions.value
+                val expenses = allTxns.filter { !it.isIncome }
+                val income = totalIncome.value
+                val totalExp = totalExpenses.value
+
+                if (expenses.isEmpty()) {
+                    _aiInsightsError.value = "Add some expenses first so Gemini can analyse your spending patterns."
+                    return@launch
+                }
+
+                // Build rich category breakdown for the prompt
+                val categoryBreakdown = expenses
+                    .groupBy { it.category }
+                    .mapValues { entry -> entry.value.sumOf { it.amount } }
+                    .entries.sortedByDescending { it.value }
+                    .joinToString("\n") { (cat, amt) ->
+                        val pct = if (totalExp > 0) (amt * 100 / totalExp) else 0
+                        "  • $cat: ₹$amt ($pct% of total spending)"
+                    }
+
+                val topCategory = expenses
+                    .groupBy { it.category }
+                    .maxByOrNull { it.value.sumOf { t -> t.amount } }
+                    ?.key ?: "Unknown"
+
+                val prompt = """
+                    You are an elite personal finance advisor inside a premium app called 'expectr'.
+                    
+                    USER'S FINANCIAL SNAPSHOT:
+                    Total Income: ₹$income
+                    Total Expenses: ₹$totalExp
+                    Savings Rate: ${if (income > 0) ((income - totalExp) * 100 / income) else 0}%
+                    Number of transactions: ${expenses.size}
+                    Top spending category: $topCategory
+                    
+                    SPENDING BY CATEGORY:
+                    $categoryBreakdown
+                    
+                    Generate exactly 3 sharp, specific insights about their SPENDING habits.
+                    Rules:
+                    - Each insight must mention a specific category name and/or amount
+                    - Insight 1: Identify their BIGGEST spending leak and quantify it
+                    - Insight 2: Spot an interesting PATTERN or COMPARISON between categories
+                    - Insight 3: Give ONE specific actionable tip to save money this month
+                    - Keep each insight under 25 words
+                    - Be direct and conversational, like a smart friend — not a boring report
+                    - Use ₹ symbol for amounts
+                    
+                    Return ONLY 3 lines, each starting with a dash (-). No headers, no markdown.
+                """.trimIndent()
+
+                val res = callGeminiApi(prompt, GEMINI_API_KEY)
+                Log.d("ZorvynAI", "Insights raw response: $res")
+                // Robust parsing: handle numbered lists (1. 2. 3.), bullets (• * -), or plain lines
+                val parsed = res.lines()
+                    .map { it.replace("**", "").replace("*", "").trim() }
+                    .map { it.replace(Regex("^\\d+[.):]+\\s*"), "") }
+                    .map { it.removePrefix("-").removePrefix("•").trim() }
+                    .filter { it.length > 10 }
+                    .take(3)
+                if (parsed.isNotEmpty()) {
+                    _aiInsights.value = parsed
+                } else {
+                    _aiInsightsError.value = "AI returned an unexpected format. Try again."
+                    Log.w("ZorvynAI", "Parsing produced 0 insights from: $res")
+                }
+            } catch (e: Exception) {
+                Log.e("ZorvynAI", "generateInsights failed", e)
+                _aiInsightsError.value = "Failed to connect: ${e.message?.take(80)}"
+            } finally {
+                _isAiLoading.value = false
+            }
         }
     }
 
@@ -237,22 +328,30 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
 
     // --- UTILITIES ---
     private suspend fun callGeminiApi(prompt: String, apiKey: String): String = withContext(Dispatchers.IO) {
-        // FIXED: Cleaned URL string (removed markdown artifacts)
-        val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
+        if (apiKey.isBlank()) {
+            throw Exception("Gemini API key is missing. Add GEMINI_API_KEY to local.properties and rebuild.")
+        }
+        val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
+        Log.d("ZorvynAI", "Calling Gemini API...")
         val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             setRequestProperty("Content-Type", "application/json")
             doOutput = true
+            connectTimeout = 15000
+            readTimeout = 30000
         }
         val body = JSONObject().put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", prompt)))))
         conn.outputStream.use { it.write(body.toString().toByteArray()) }
 
         if (conn.responseCode == 200) {
             val responseText = conn.inputStream.bufferedReader().readText()
-            JSONObject(responseText).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+            val text = JSONObject(responseText).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+            Log.d("ZorvynAI", "API success, response length: ${text.length}")
+            text
         } else {
             val error = conn.errorStream?.bufferedReader()?.readText() ?: "Unknown Error"
-            throw Exception("API Error ${conn.responseCode}: $error")
+            Log.e("ZorvynAI", "API Error ${conn.responseCode}: $error")
+            throw Exception("API Error ${conn.responseCode}: ${error.take(200)}")
         }
     }
 
