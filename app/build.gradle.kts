@@ -108,6 +108,5 @@ dependencies {
 
     // --- Coroutines Play Services (for Task.await()) ---
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
-    implementation("com.airbnb.android:lottie-compose:6.0.0")
 }
 
