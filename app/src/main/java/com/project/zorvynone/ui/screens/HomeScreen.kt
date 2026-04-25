@@ -10,9 +10,13 @@ import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -30,14 +34,21 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
@@ -187,7 +198,7 @@ fun HomeScreen(
             PremiumHomeHeader()
             Spacer(modifier = Modifier.height(32.dp))
 
-            PremiumBalanceCard(balance = balance, income = income, expense = expense)
+            TitaniumDebitCard(balance = balance, score = currentScore)
             Spacer(modifier = Modifier.height(24.dp))
 
             PremiumCredScoreCard(score = currentScore, onClick = onScoreClick)
@@ -304,63 +315,192 @@ fun PremiumHomeHeader() {
     }
 }
 
+// --- TITANIUM DEBIT CARD ---
+
+private val CardGold = Color(0xFFE5C158)
+private val ChipGold = Color(0xFFD4AF37)
+
 @Composable
-fun PremiumBalanceCard(balance: Int, income: Int, expense: Int) {
+fun TitaniumDebitCard(balance: Int, score: Int) {
     val animatedBalance by animateIntAsState(
         targetValue = balance,
         animationSpec = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
         label = "balanceAnim"
     )
-    val animatedIncome by animateIntAsState(
-        targetValue = income,
-        animationSpec = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
-        label = "incomeAnim"
-    )
-    val animatedExpense by animateIntAsState(
-        targetValue = expense,
-        animationSpec = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
-        label = "expenseAnim"
-    )
 
     val formatter = NumberFormat.getNumberInstance(Locale("en", "IN"))
-    val cardBg = Color(0xFF1C2238)
-    val cardBorder = Color(0xFF2A314A)
+    val userName = FirebaseAuth.getInstance().currentUser?.displayName ?: "Card Holder"
 
-    val savingsRate = if (income > 0) ((income - expense).toFloat() / income.toFloat() * 100).toInt() else 0
-    val isPositive = savingsRate >= 0
-    val displayRate = abs(savingsRate)
+    // Press-down scale animation
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "card_press"
+    )
 
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = cardBg), border = BorderStroke(1.dp, cardBorder)) {
-        Column(modifier = Modifier.padding(24.dp)) {
-            Text("TOTAL BALANCE", color = TextSecondary.copy(alpha = 0.8f), fontSize = 12.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text("₹${formatter.format(animatedBalance)}", color = TextPrimary, fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp)
-                Text(".00", color = TextSecondary.copy(alpha = 0.6f), fontSize = 20.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 6.dp))
-            }
-            Spacer(modifier = Modifier.height(12.dp))
+    // Metallic gradient
+    val titaniumGradient = Brush.linearGradient(
+        colors = listOf(Color(0xFF2A2D34), Color(0xFF1A1C22), Color(0xFF141518)),
+        start = Offset(0f, 0f),
+        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+    )
 
-            if (income > 0) {
-                val pillColor = if (isPositive) ZorvynGreen else ZorvynRed
-                val icon = if (isPositive) Icons.AutoMirrored.Filled.TrendingUp else Icons.AutoMirrored.Filled.TrendingDown
-                val sign = if (isPositive) "+" else "-"
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Row(modifier = Modifier.border(1.dp, pillColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp)).background(pillColor.copy(alpha = 0.1f), RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(icon, contentDescription = null, tint = pillColor, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("$sign$displayRate%", color = pillColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1.586f) // ISO 7810 credit card ratio
+            .scale(scale)
+            .shadow(
+                elevation = 24.dp,
+                shape = RoundedCornerShape(16.dp),
+                ambientColor = Color.Black,
+                spotColor = Color.Black.copy(alpha = 0.6f)
+            )
+            .background(titaniumGradient, RoundedCornerShape(16.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(16.dp))
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        isPressed = true
+                        tryAwaitRelease()
+                        isPressed = false
                     }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(if (isPositive) "saved this month" else "overspent this month", color = TextSecondary.copy(alpha = 0.6f), fontSize = 12.sp)
-                }
-            } else {
-                Text("Add income to track your savings rate", color = TextSecondary.copy(alpha = 0.5f), fontSize = 12.sp)
+                )
             }
-            Spacer(modifier = Modifier.height(24.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                PremiumStatBox(modifier = Modifier.weight(1f), title = "INCOME", amount = "₹${formatter.format(animatedIncome)}", isIncome = true)
-                PremiumStatBox(modifier = Modifier.weight(1f), title = "EXPENSES", amount = "₹${formatter.format(animatedExpense)}", isIncome = false)
+            .padding(24.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // --- TOP ROW: Chip + NFC + Brand ---
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // EMV Chip
+                    Box(
+                        modifier = Modifier
+                            .size(width = 40.dp, height = 30.dp)
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        ChipGold,
+                                        Color(0xFFC9A036),
+                                        ChipGold.copy(alpha = 0.8f)
+                                    )
+                                ),
+                                RoundedCornerShape(6.dp)
+                            )
+                            .border(0.5.dp, ChipGold.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                    ) {
+                        // Chip lines
+                        Canvas(modifier = Modifier.fillMaxSize().padding(4.dp)) {
+                            val w = size.width
+                            val h = size.height
+                            val lineColor = Color(0xFFAA8820).copy(alpha = 0.5f)
+                            // Horizontal lines
+                            drawLine(lineColor, Offset(0f, h * 0.33f), Offset(w, h * 0.33f), strokeWidth = 0.8f)
+                            drawLine(lineColor, Offset(0f, h * 0.66f), Offset(w, h * 0.66f), strokeWidth = 0.8f)
+                            // Vertical center
+                            drawLine(lineColor, Offset(w * 0.5f, 0f), Offset(w * 0.5f, h), strokeWidth = 0.8f)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // NFC icon
+                    Icon(
+                        imageVector = Icons.Default.Wifi,
+                        contentDescription = "NFC",
+                        tint = Color.White.copy(alpha = 0.3f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                // Brand name
+                Text(
+                    text = "EXPECTR BLACK",
+                    color = CardGold,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 3.sp
+                )
+            }
+
+            // --- MIDDLE ROW: Vault Balance ---
+            Column {
+                Text(
+                    text = "VAULT BALANCE",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(SpanStyle(fontSize = 24.sp, color = Color.White.copy(alpha = 0.7f))) {
+                            append("₹")
+                        }
+                        withStyle(SpanStyle(fontSize = 34.sp, color = Color.White, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)) {
+                            append(formatter.format(animatedBalance))
+                        }
+                        withStyle(SpanStyle(fontSize = 18.sp, color = Color.White.copy(alpha = 0.4f), fontFamily = FontFamily.Monospace)) {
+                            append(".00")
+                        }
+                    }
+                )
+            }
+
+            // --- BOTTOM ROW: Architect + Health ---
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "ARCHITECT",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = userName.uppercase(),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "HEALTH",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "$score/100",
+                        color = CardGold,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp
+                    )
+                }
             }
         }
     }

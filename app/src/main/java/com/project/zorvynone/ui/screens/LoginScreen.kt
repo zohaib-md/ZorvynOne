@@ -6,12 +6,17 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -19,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -26,15 +32,22 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.project.zorvynone.ui.theme.*
 import com.project.zorvynone.viewmodel.AuthViewModel
+import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 // Premium Palette
 private val PremiumGold = Color(0xFFE5C158)
@@ -86,7 +99,7 @@ fun LoginScreen(
 
     LaunchedEffect(resetEmailSent) {
         if (resetEmailSent) {
-            snackbarHostState.showSnackbar("Recovery blueprint sent to your inbox.")
+            snackbarHostState.showSnackbar("Password reset email sent! Check your inbox.")
             authViewModel.clearResetFlag()
         }
     }
@@ -140,7 +153,7 @@ fun LoginScreen(
                     letterSpacing = (-0.5).sp
                 )
                 Text(
-                    text = "Access your private vault below.",
+                    text = "Sign in to continue.",
                     color = TextSecondary.copy(alpha = 0.7f),
                     fontSize = 14.sp
                 )
@@ -215,39 +228,30 @@ fun LoginScreen(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.clickable {
                             if (email.contains("@")) authViewModel.sendPasswordReset(email)
-                            else emailError = "Enter email for recovery"
+                            else emailError = "Enter your email first"
                         }
                     )
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Primary Button
-                Button(
-                    onClick = {
+                // Swipe to Sign In
+                SwipeToSignInButton(
+                    isLoading = isLoading,
+                    onSwipeComplete = {
                         if (email.contains("@") && password.length >= 6) authViewModel.signInWithEmail(email, password)
                         else {
                             if (!email.contains("@")) emailError = "Invalid email"
                             if (password.length < 6) passwordError = "Required"
                         }
-                    },
-                    enabled = !isLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = PremiumGold),
-                    modifier = Modifier.fillMaxWidth().height(58.dp),
-                    shape = RoundedCornerShape(18.dp)
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text("Access Vault", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
                     }
-                }
+                )
 
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White.copy(0.05f))
-                    Text("  SECURE HANDSHAKE  ", color = TextSecondary.copy(0.3f), fontSize = 10.sp, letterSpacing = 2.sp)
+                    Text("  OR  ", color = TextSecondary.copy(0.3f), fontSize = 10.sp, letterSpacing = 2.sp)
                     HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White.copy(0.05f))
                 }
 
@@ -270,9 +274,9 @@ fun LoginScreen(
 
                 // Footer
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    Text("New to the ecosystem? ", color = TextSecondary, fontSize = 14.sp)
+                    Text("Don't have an account? ", color = TextSecondary, fontSize = 14.sp)
                     Text(
-                        text = "Initialize Architect",
+                        text = "Sign Up",
                         color = PremiumGold,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Black,
@@ -280,6 +284,130 @@ fun LoginScreen(
                     )
                 }
                 Spacer(modifier = Modifier.height(40.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SwipeToSignInButton(
+    isLoading: Boolean,
+    onSwipeComplete: () -> Unit
+) {
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+    val handleSizeDp = 52.dp
+    val trackHeight = 62.dp
+    val handleSizePx = with(density) { handleSizeDp.toPx() }
+
+    var trackWidthPx by remember { mutableFloatStateOf(0f) }
+    val maxDragPx = (trackWidthPx - handleSizePx).coerceAtLeast(0f)
+
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var hasTriggered by remember { mutableStateOf(false) }
+    val swipeProgress = if (maxDragPx > 0f) (dragOffset / maxDragPx).coerceIn(0f, 1f) else 0f
+
+    val animatedOffset by animateFloatAsState(
+        targetValue = dragOffset,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "drag_snap"
+    )
+
+    val shimmerTransition = rememberInfiniteTransition(label = "shimmer")
+    val shimmerAlpha by shimmerTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmer_alpha"
+    )
+
+    if (isLoading) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(trackHeight)
+                .background(PremiumGold.copy(alpha = 0.15f), RoundedCornerShape(31.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(color = PremiumGold, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("SIGNING IN...", color = PremiumGold, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            }
+        }
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(trackHeight)
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(PremiumGold.copy(alpha = 0.08f), PremiumGold.copy(alpha = 0.15f))
+                    ),
+                    RoundedCornerShape(31.dp)
+                )
+                .border(1.dp, PremiumGold.copy(alpha = 0.15f), RoundedCornerShape(31.dp))
+                .onSizeChanged { trackWidthPx = it.width.toFloat() },
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(with(density) { (animatedOffset + handleSizePx).toDp() })
+                    .fillMaxHeight()
+                    .background(PremiumGold.copy(alpha = 0.12f * swipeProgress), RoundedCornerShape(31.dp))
+            )
+
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "SWIPE TO SIGN IN  →",
+                    color = PremiumGold.copy(alpha = shimmerAlpha * (1f - swipeProgress)),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(animatedOffset.roundToInt(), 0) }
+                    .padding(4.dp)
+                    .size(handleSizeDp)
+                    .clip(CircleShape)
+                    .background(PremiumGold)
+                    .draggable(
+                        orientation = Orientation.Horizontal,
+                        state = rememberDraggableState { delta ->
+                            if (!hasTriggered) {
+                                dragOffset = (dragOffset + delta).coerceIn(0f, maxDragPx)
+                                if (swipeProgress >= 0.85f) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                }
+                            }
+                        },
+                        onDragStopped = {
+                            if (swipeProgress >= 0.85f && !hasTriggered) {
+                                hasTriggered = true
+                                dragOffset = maxDragPx
+                                onSwipeComplete()
+                                delay(500)
+                                hasTriggered = false
+                                dragOffset = 0f
+                            } else {
+                                dragOffset = 0f
+                            }
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = "Swipe to sign in",
+                    tint = Color.Black,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
     }

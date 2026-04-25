@@ -1,5 +1,7 @@
 package com.project.zorvynone.ui.screens
 
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -7,12 +9,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -139,9 +150,9 @@ fun TransactionsScreen(viewModel: HomeViewModel, onNavigateHome: () -> Unit, onN
 
             // The List itself
             if (filteredTransactions.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No transactions found", color = TextSecondary)
-                }
+                KineticEmptyState(
+                    modifier = Modifier.fillMaxSize()
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -215,3 +226,175 @@ fun TransactionsScreen(viewModel: HomeViewModel, onNavigateHome: () -> Unit, onN
 // A slightly modified BottomNavBar that highlights the correct tab
 
 
+// --- KINETIC EMPTY STATE ---
+
+private val EmptyGold = Color(0xFFE5C158)
+private val EmptyAmber = Color(0xFFD4A24E)
+
+@Composable
+private fun KineticEmptyState(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "kinetic")
+
+    // 1. Levitation
+    val levitationOffset by infiniteTransition.animateFloat(
+        initialValue = -15f,
+        targetValue = 15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "levitate"
+    )
+
+    // 2. Outer ring rotation (clockwise)
+    val outerRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(8000, easing = LinearEasing)
+        ),
+        label = "outer_ring"
+    )
+
+    // 3. Inner ring rotation (counter-clockwise, faster)
+    val innerRotation by infiniteTransition.animateFloat(
+        initialValue = 360f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(5000, easing = LinearEasing)
+        ),
+        label = "inner_ring"
+    )
+
+    // 4. Shimmer offset for text
+    val shimmerOffset by infiniteTransition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2500, easing = LinearEasing)
+        ),
+        label = "shimmer"
+    )
+
+    // 5. Pulse for ambient glow
+    val glowPulse by infiniteTransition.animateFloat(
+        initialValue = 0.08f,
+        targetValue = 0.18f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow"
+    )
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.offset(y = levitationOffset.dp)
+        ) {
+            // --- ORBITAL CANVAS ---
+            Box(
+                modifier = Modifier.size(180.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val outerRadius = size.minDimension / 2f - 8f
+                    val innerRadius = outerRadius - 22f
+
+                    // Ambient glow
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                EmptyGold.copy(alpha = glowPulse),
+                                EmptyAmber.copy(alpha = glowPulse * 0.4f),
+                                Color.Transparent
+                            ),
+                            center = Offset(cx, cy),
+                            radius = outerRadius * 1.3f
+                        ),
+                        radius = outerRadius * 1.3f,
+                        center = Offset(cx, cy)
+                    )
+
+                    // Outer orbital ring (280° broken arc, rotating clockwise)
+                    rotate(degrees = outerRotation, pivot = Offset(cx, cy)) {
+                        drawArc(
+                            color = EmptyGold.copy(alpha = 0.35f),
+                            startAngle = 0f,
+                            sweepAngle = 280f,
+                            useCenter = false,
+                            topLeft = Offset(cx - outerRadius, cy - outerRadius),
+                            size = Size(outerRadius * 2, outerRadius * 2),
+                            style = Stroke(width = 2.5f, cap = StrokeCap.Round)
+                        )
+                    }
+
+                    // Inner dashed ring (counter-clockwise)
+                    rotate(degrees = innerRotation, pivot = Offset(cx, cy)) {
+                        val dashCount = 24
+                        val dashSweep = 8f
+                        val gapSweep = (360f / dashCount) - dashSweep
+                        for (i in 0 until dashCount) {
+                            val startAngle = i * (dashSweep + gapSweep)
+                            drawArc(
+                                color = EmptyAmber.copy(alpha = 0.2f),
+                                startAngle = startAngle,
+                                sweepAngle = dashSweep,
+                                useCenter = false,
+                                topLeft = Offset(cx - innerRadius, cy - innerRadius),
+                                size = Size(innerRadius * 2, innerRadius * 2),
+                                style = Stroke(width = 1.5f, cap = StrokeCap.Round)
+                            )
+                        }
+                    }
+                }
+
+                // Central Add icon
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = "Add transaction",
+                    tint = EmptyGold.copy(alpha = 0.8f),
+                    modifier = Modifier.size(52.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // --- SHIMMER TEXT ---
+            Text(
+                text = "Initiate your first sequence.",
+                style = TextStyle(
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            EmptyGold.copy(alpha = 0.4f),
+                            EmptyGold,
+                            Color.White,
+                            EmptyGold,
+                            EmptyGold.copy(alpha = 0.4f)
+                        ),
+                        start = Offset(shimmerOffset * 600f, 0f),
+                        end = Offset(shimmerOffset * 600f + 300f, 0f)
+                    ),
+                    letterSpacing = 0.5.sp
+                )
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Tap the Add button below to begin\nmapping your wealth intelligence.",
+                color = TextSecondary.copy(alpha = 0.5f),
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp
+            )
+        }
+    }
+}

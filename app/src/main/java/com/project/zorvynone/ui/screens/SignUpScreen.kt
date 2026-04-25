@@ -7,19 +7,25 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -27,7 +33,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -38,7 +48,7 @@ import androidx.compose.ui.unit.sp
 import com.airbnb.lottie.compose.*
 import com.project.zorvynone.ui.theme.*
 import com.project.zorvynone.viewmodel.AuthViewModel
-import com.project.zorvynone.R // Ensure you have rocket_launch.json in res/raw
+import com.project.zorvynone.R
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -71,38 +81,12 @@ fun SignUpScreen(
     val isLoading = authState is AuthViewModel.AuthState.Loading
     val context = LocalContext.current
 
-    // --- NEW: ROCKET LAUNCH STATE ---
+    // --- ROCKET LAUNCH STATE ---
     var isLaunching by remember { mutableStateOf(false) }
 
-    // --- ANIMATION STATES ---
-    val fullTitle = "expectr"
-    var displayedTitle by remember { mutableStateOf("") }
-    var isTypingComplete by remember { mutableStateOf(false) }
-
-    // 1. Cinematic Typing Logic
-    LaunchedEffect(Unit) {
-        delay(400)
-        fullTitle.forEachIndexed { index, _ ->
-            displayedTitle = fullTitle.substring(0, index + 1)
-            delay(100)
-        }
-        isTypingComplete = true
-    }
-
-    // 2. Blinking Cursor Animation
-    val cursorTransition = rememberInfiniteTransition(label = "cursor")
-    val cursorAlpha by cursorTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(400),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "cursor_blink"
-    )
-
-    // 3. Staggered Entrance Controller
-    val startStagger by remember { derivedStateOf { displayedTitle.length >= 4 } }
+    // Staggered entrance starts immediately (no typing delay)
+    var startStagger by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { delay(300); startStagger = true }
 
     // Pulse Animation for Tagline
     val infiniteTransition = rememberInfiniteTransition(label = "tagline_pulse")
@@ -171,32 +155,20 @@ fun SignUpScreen(
                     SignUpGeometricArt()
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = displayedTitle,
-                                color = Color.White,
-                                fontSize = 42.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = (-1.5).sp
-                            )
-                            if (!isTypingComplete) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(3.dp)
-                                        .height(36.dp)
-                                        .padding(start = 4.dp)
-                                        .alpha(cursorAlpha)
-                                        .background(PremiumGold)
-                                )
-                            }
-                        }
                         Text(
-                            text = "ESTABLISH BLUEPRINT",
+                            text = "expectr",
+                            color = Color.White,
+                            fontSize = 42.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = (-1.5).sp
+                        )
+                        Text(
+                            text = "CREATE ACCOUNT",
                             color = PremiumGold,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 4.sp,
-                            modifier = Modifier.alpha(if (isTypingComplete) taglineAlpha else 0f)
+                            modifier = Modifier.alpha(taglineAlpha)
                         )
                     }
                 }
@@ -205,14 +177,14 @@ fun SignUpScreen(
                 StaggeredEntrance(visible = startStagger, delayMillis = 0) {
                     Column(modifier = Modifier.padding(horizontal = 32.dp).fillMaxWidth()) {
                         Text(
-                            text = "Initialize Architect",
+                            text = "Create Account",
                             color = TextPrimary,
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = (-0.5).sp
                         )
                         Text(
-                            text = "Begin your journey to wealth clarity.",
+                            text = "Sign up to get started.",
                             color = TextSecondary.copy(alpha = 0.7f),
                             fontSize = 14.sp
                         )
@@ -239,7 +211,7 @@ fun SignUpScreen(
                         OutlinedTextField(
                             value = username,
                             onValueChange = { username = it; usernameError = null },
-                            placeholder = { Text("Alias / Full Name", color = TextSecondary.copy(alpha = 0.4f)) },
+                            placeholder = { Text("Full Name", color = TextSecondary.copy(alpha = 0.4f)) },
                             isError = usernameError != null,
                             colors = OutlinedTextFieldDefaults.colors(
                                 unfocusedContainerColor = GlassSurface,
@@ -261,7 +233,7 @@ fun SignUpScreen(
                         OutlinedTextField(
                             value = email,
                             onValueChange = { email = it; emailError = null },
-                            placeholder = { Text("Vault Email Address", color = TextSecondary.copy(alpha = 0.4f)) },
+                            placeholder = { Text("Email Address", color = TextSecondary.copy(alpha = 0.4f)) },
                             isError = emailError != null,
                             colors = OutlinedTextFieldDefaults.colors(
                                 unfocusedContainerColor = GlassSurface,
@@ -284,7 +256,7 @@ fun SignUpScreen(
                         OutlinedTextField(
                             value = password,
                             onValueChange = { password = it; passwordError = null },
-                            placeholder = { Text("System Access Key (6+ characters)", color = TextSecondary.copy(alpha = 0.4f)) },
+                            placeholder = { Text("Password (6+ characters)", color = TextSecondary.copy(alpha = 0.4f)) },
                             isError = passwordError != null,
                             trailingIcon = {
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -317,34 +289,26 @@ fun SignUpScreen(
                 StaggeredEntrance(visible = startStagger, delayMillis = 400) {
                     Column(modifier = Modifier.padding(horizontal = 32.dp).fillMaxWidth()) {
                         Spacer(modifier = Modifier.height(32.dp))
-                        Button(
-                            onClick = {
+
+                        // --- SWIPE TO SIGN UP SLIDER ---
+                        SwipeToSignUpButton(
+                            isLoading = isLoading,
+                            onSwipeComplete = {
                                 var valid = true
                                 if (username.isBlank()) { usernameError = "Name required"; valid = false }
                                 if (email.isBlank() || !email.contains("@")) { emailError = "Invalid email"; valid = false }
                                 if (password.length < 6) { passwordError = "Too short"; valid = false }
                                 if (valid) {
-                                    // Trigger animation if auth logic is starting
                                     authViewModel.signUpWithEmail(username, email, password)
                                 }
-                            },
-                            enabled = !isLoading,
-                            colors = ButtonDefaults.buttonColors(containerColor = PremiumGold),
-                            modifier = Modifier.fillMaxWidth().height(58.dp),
-                            shape = RoundedCornerShape(18.dp)
-                        ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                            } else {
-                                Text("Launch System", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
                             }
-                        }
+                        )
 
                         Spacer(modifier = Modifier.height(32.dp))
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White.copy(0.05f))
-                            Text("  SOCIAL SYNC  ", color = TextSecondary.copy(0.3f), fontSize = 10.sp, letterSpacing = 2.sp)
+                            Text("  OR  ", color = TextSecondary.copy(0.3f), fontSize = 10.sp, letterSpacing = 2.sp)
                             HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White.copy(0.05f))
                         }
 
@@ -367,7 +331,7 @@ fun SignUpScreen(
                         Spacer(modifier = Modifier.height(40.dp))
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                            Text("Already part of the ecosystem? ", color = TextSecondary, fontSize = 14.sp)
+                            Text("Already have an account? ", color = TextSecondary, fontSize = 14.sp)
                             Text(
                                 text = "Sign In",
                                 color = PremiumGold,
@@ -406,7 +370,7 @@ fun SignUpScreen(
 
                 if (progress >= 0.8f) {
                     Text(
-                        text = "TAKEOFF SUCCESSFUL",
+                        text = "Account Created!",
                         color = PremiumGold,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
@@ -461,6 +425,159 @@ private fun SignUpGeometricArt() {
         drawCircle(brush = Brush.radialGradient(colors = listOf(PremiumGold.copy(0.15f), Color.Transparent), center = Offset(w * 0.8f, h * 0.2f), radius = w * 0.4f), radius = w * 0.4f, center = Offset(w * 0.8f, h * 0.2f))
         rotate(degrees = 10f, pivot = Offset(w * 0.3f, h * 0.7f)) {
             drawRoundRect(color = Color(0xFF252D42).copy(alpha = 0.2f), topLeft = Offset(w * 0.1f, h * 0.4f), size = Size(w * 0.4f, h * 0.4f), cornerRadius = CornerRadius(30f, 30f))
+        }
+    }
+}
+
+// --- SWIPE TO SIGN UP SLIDER ---
+
+@Composable
+private fun SwipeToSignUpButton(
+    isLoading: Boolean,
+    onSwipeComplete: () -> Unit
+) {
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+    val handleSizeDp = 52.dp
+    val trackHeight = 62.dp
+    val handleSizePx = with(density) { handleSizeDp.toPx() }
+
+    var trackWidthPx by remember { mutableFloatStateOf(0f) }
+    val maxDragPx = (trackWidthPx - handleSizePx).coerceAtLeast(0f)
+
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var hasTriggered by remember { mutableStateOf(false) }
+    val swipeProgress = if (maxDragPx > 0f) (dragOffset / maxDragPx).coerceIn(0f, 1f) else 0f
+
+    // Animate snap-back
+    val animatedOffset by animateFloatAsState(
+        targetValue = dragOffset,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "drag_snap"
+    )
+
+    // Shimmer for hint text
+    val shimmerTransition = rememberInfiniteTransition(label = "shimmer")
+    val shimmerAlpha by shimmerTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmer_alpha"
+    )
+
+    if (isLoading) {
+        // Loading state: show a centered spinner in the track
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(trackHeight)
+                .background(
+                    PremiumGold.copy(alpha = 0.15f),
+                    RoundedCornerShape(31.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    color = PremiumGold,
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    "CREATING ACCOUNT...",
+                    color = PremiumGold,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.5.sp
+                )
+            }
+        }
+    } else {
+        // Swipe track
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(trackHeight)
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            PremiumGold.copy(alpha = 0.08f),
+                            PremiumGold.copy(alpha = 0.15f)
+                        )
+                    ),
+                    RoundedCornerShape(31.dp)
+                )
+                .border(1.dp, PremiumGold.copy(alpha = 0.15f), RoundedCornerShape(31.dp))
+                .onSizeChanged { trackWidthPx = it.width.toFloat() },
+            contentAlignment = Alignment.CenterStart
+        ) {
+            // Gold fill behind the drag
+            Box(
+                modifier = Modifier
+                    .width(with(density) { (animatedOffset + handleSizePx).toDp() })
+                    .fillMaxHeight()
+                    .background(
+                        PremiumGold.copy(alpha = 0.12f * swipeProgress),
+                        RoundedCornerShape(31.dp)
+                    )
+            )
+
+            // Hint text (fades as you drag)
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "SWIPE TO SIGN UP  →",
+                    color = PremiumGold.copy(alpha = shimmerAlpha * (1f - swipeProgress)),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+            }
+
+            // Draggable handle
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(animatedOffset.roundToInt(), 0) }
+                    .padding(4.dp)
+                    .size(handleSizeDp)
+                    .clip(CircleShape)
+                    .background(PremiumGold)
+                    .draggable(
+                        orientation = Orientation.Horizontal,
+                        state = rememberDraggableState { delta ->
+                            if (!hasTriggered) {
+                                dragOffset = (dragOffset + delta).coerceIn(0f, maxDragPx)
+                                // Haptic when crossing threshold
+                                if (swipeProgress >= 0.85f) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                }
+                            }
+                        },
+                        onDragStopped = {
+                            if (swipeProgress >= 0.85f && !hasTriggered) {
+                                hasTriggered = true
+                                dragOffset = maxDragPx
+                                onSwipeComplete()
+                                delay(500)
+                                hasTriggered = false
+                                dragOffset = 0f
+                            } else {
+                                dragOffset = 0f
+                            }
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = "Swipe to sign up",
+                    tint = Color.Black,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     }
 }
