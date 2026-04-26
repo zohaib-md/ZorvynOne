@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -63,6 +64,7 @@ import com.project.zorvynone.model.IconType
 import com.project.zorvynone.model.Transaction
 import com.project.zorvynone.ui.theme.*
 import com.project.zorvynone.viewmodel.HomeViewModel
+import com.project.zorvynone.KommunicateHelper
 import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.abs
@@ -100,7 +102,8 @@ fun HomeScreen(
     onTxnsClick: () -> Unit = {},
     onInsightsClick: () -> Unit = {},
     onScoreNavClick: () -> Unit = {},
-    onSignOut: () -> Unit = {}
+    onSignOut: () -> Unit = {},
+    onChatClick: () -> Unit = {}
 ) {
     val balance by viewModel.totalBalance.collectAsStateWithLifecycle()
     val income by viewModel.totalIncome.collectAsStateWithLifecycle()
@@ -145,31 +148,222 @@ fun HomeScreen(
         }
     }
 
+    // --- PREMIUM SPEED DIAL FAB STATE ---
+    var isFabExpanded by remember { mutableStateOf(false) }
+
+    // Main FAB rotation animation
+    val fabRotation by animateFloatAsState(
+        targetValue = if (isFabExpanded) 135f else 0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
+        label = "fab_rotation"
+    )
+
+    // Pulsing glow for the main FAB
+    val infiniteTransition = rememberInfiniteTransition(label = "fab_glow")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_alpha"
+    )
+
+    // Speed dial option animations (staggered)
+    val option1Offset by animateFloatAsState(
+        targetValue = if (isFabExpanded) 0f else 80f,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        label = "opt1_offset"
+    )
+    val option1Alpha by animateFloatAsState(
+        targetValue = if (isFabExpanded) 1f else 0f,
+        animationSpec = tween(if (isFabExpanded) 200 else 100),
+        label = "opt1_alpha"
+    )
+    val option2Offset by animateFloatAsState(
+        targetValue = if (isFabExpanded) 0f else 60f,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMedium),
+        label = "opt2_offset"
+    )
+    val option2Alpha by animateFloatAsState(
+        targetValue = if (isFabExpanded) 1f else 0f,
+        animationSpec = tween(if (isFabExpanded) 300 else 100, delayMillis = if (isFabExpanded) 50 else 0),
+        label = "opt2_alpha"
+    )
+
+    // Colors
+    val fabGold = Color(0xFFE5C158)
+    val fabDark = Color(0xFF141518)
+    val fabSurface = Color(0xFF1C2238)
+
     Scaffold(
         containerColor = ZorvynBackground,
         floatingActionButtonPosition = FabPosition.End,
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                modifier = Modifier.offset(y = (-16).dp),
-                onClick = {
-                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Say a transaction")
-                    }
-                    speechLauncher.launch(intent)
-                },
-                containerColor = Color(0xFF2A2045),
-                contentColor = Color(0xFFA288E3),
-                shape = RoundedCornerShape(50)
+            Column(
+                modifier = Modifier
+                    .offset(y = (-16).dp)
+                    .padding(end = 4.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                if (isVoiceLoading) {
-                    CircularProgressIndicator(color = Color(0xFFA288E3), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Processing...", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                } else {
-                    Icon(Icons.Default.Mic, contentDescription = "Voice Assistant", modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Voice AI", fontWeight = FontWeight.Bold, fontSize = 14.sp, letterSpacing = 0.5.sp)
+                // --- OPTION 2: Ask Experia (top) ---
+                Row(
+                    modifier = Modifier
+                        .graphicsLayer(
+                            alpha = option2Alpha,
+                            translationY = option2Offset
+                        )
+                        .padding(bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    if (isFabExpanded) {
+                        Box(
+                            modifier = Modifier
+                                .shadow(6.dp, RoundedCornerShape(8.dp))
+                                .background(fabSurface, RoundedCornerShape(8.dp))
+                                .border(0.5.dp, fabGold.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                "Ask Experia",
+                                color = fabGold,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    FloatingActionButton(
+                        onClick = {
+                            isFabExpanded = false
+                            onChatClick()
+                        },
+                        containerColor = fabDark,
+                        contentColor = fabGold,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .border(1.dp, fabGold.copy(alpha = 0.4f), CircleShape),
+                        elevation = FloatingActionButtonDefaults.elevation(6.dp, 10.dp)
+                    ) {
+                        Icon(Icons.Default.SmartToy, contentDescription = "Ask Experia", modifier = Modifier.size(20.dp))
+                    }
+                }
+
+                // --- OPTION 1: Voice AI (closer to main FAB) ---
+                Row(
+                    modifier = Modifier
+                        .graphicsLayer(
+                            alpha = option1Alpha,
+                            translationY = option1Offset
+                        )
+                        .padding(bottom = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    if (isFabExpanded) {
+                        Box(
+                            modifier = Modifier
+                                .shadow(6.dp, RoundedCornerShape(8.dp))
+                                .background(fabSurface, RoundedCornerShape(8.dp))
+                                .border(0.5.dp, fabGold.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                if (isVoiceLoading) "Processing..." else "Voice AI",
+                                color = fabGold,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    FloatingActionButton(
+                        onClick = {
+                            isFabExpanded = false
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Say a transaction")
+                            }
+                            speechLauncher.launch(intent)
+                        },
+                        containerColor = fabDark,
+                        contentColor = fabGold,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .border(1.dp, fabGold.copy(alpha = 0.4f), CircleShape),
+                        elevation = FloatingActionButtonDefaults.elevation(6.dp, 10.dp)
+                    ) {
+                        if (isVoiceLoading) {
+                            CircularProgressIndicator(color = fabGold, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Mic, contentDescription = "Voice AI", modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+
+                // --- MAIN FAB (Speed Dial Trigger) ---
+                Box(contentAlignment = Alignment.Center) {
+                    // Pulsing glow ring (only when collapsed)
+                    if (!isFabExpanded) {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .scale(pulseScale)
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(
+                                            fabGold.copy(alpha = pulseAlpha),
+                                            Color.Transparent
+                                        )
+                                    ),
+                                    CircleShape
+                                )
+                        )
+                    }
+                    FloatingActionButton(
+                        onClick = { isFabExpanded = !isFabExpanded },
+                        containerColor = fabDark,
+                        contentColor = fabGold,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .border(
+                                width = 1.5.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        fabGold.copy(alpha = 0.8f),
+                                        fabGold.copy(alpha = 0.2f),
+                                        fabGold.copy(alpha = 0.6f)
+                                    )
+                                ),
+                                shape = CircleShape
+                            ),
+                        elevation = FloatingActionButtonDefaults.elevation(10.dp, 14.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isFabExpanded) Icons.Default.Close else Icons.Default.AutoAwesome,
+                            contentDescription = if (isFabExpanded) "Close" else "AI Assistant",
+                            modifier = Modifier
+                                .size(24.dp)
+                                .graphicsLayer(rotationZ = fabRotation)
+                        )
+                    }
                 }
             }
         },
@@ -221,6 +415,8 @@ fun HomeScreen(
                 }
             )
             Spacer(modifier = Modifier.height(32.dp))
+
+            // Experia chatbot is now a FAB — no card here
 
             RecentTransactionsSection(transactions = transactions, onDelete = { txn -> viewModel.deleteTransaction(txn) })
             Spacer(modifier = Modifier.height(80.dp))
@@ -822,6 +1018,94 @@ fun TransactionItem(icon: ImageVector, iconTint: Color, title: String, subtitle:
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
         )
+    }
+}
+
+// --- EXPERIA CHATBOT CARD ---
+@Composable
+fun ExperiaChatCard(onClick: () -> Unit) {
+    val experiaPurple = Color(0xFFA288E3)
+    val experiaBg = Color(0xFF2A2045)
+
+    val infiniteTransition = rememberInfiniteTransition(label = "experia_glow")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "experia_glow_alpha"
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = experiaBg),
+        border = BorderStroke(1.dp, experiaPurple.copy(alpha = 0.3f))
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(20.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Animated glow icon container
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    experiaPurple.copy(alpha = glowAlpha * 0.4f),
+                                    experiaPurple.copy(alpha = 0.1f)
+                                )
+                            ),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SmartToy,
+                        contentDescription = "Ask Experia",
+                        tint = experiaPurple,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = "Ask Experia",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Your AI financial assistant",
+                        color = TextSecondary.copy(alpha = 0.8f),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .background(experiaPurple.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "CHAT",
+                    color = experiaPurple,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.5.sp
+                )
+            }
+        }
     }
 }
 

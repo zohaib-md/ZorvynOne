@@ -16,6 +16,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Kommunicate SDK repository
+        maven { url = uri("https://kommunicate.jfrog.io/artifactory/kommunicate-android-sdk") }
     }
 }
 

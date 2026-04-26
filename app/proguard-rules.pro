@@ -19,3 +19,12 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# --- Kommunicate SDK ProGuard Rules ---
+-keep class net.sqlcipher.** { *; }
+-keep class javax.crypto.** { *; }
+-keep class net.zetetic.database.sqlcipher.* { *; }
+-keep class net.zetetic.database.sqlcipher.** { *; }
+-keepattributes *Annotation*
+-keep class io.kommunicate.** { *; }
+-keep class io.kommunicate.ui.** { *; }

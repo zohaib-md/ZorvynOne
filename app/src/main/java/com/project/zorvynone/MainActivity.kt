@@ -39,6 +39,7 @@ import com.project.zorvynone.ui.theme.ZorvynBackground
 import com.project.zorvynone.ui.theme.ZorvynOneTheme
 import com.project.zorvynone.viewmodel.AuthViewModel
 import com.project.zorvynone.viewmodel.HomeViewModel
+import com.project.zorvynone.KommunicateHelper
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -63,6 +64,14 @@ class MainActivity : ComponentActivity() {
             authPrefs.isLoggedIn = true
             authPrefs.email = firebaseUser.email ?: ""
             authPrefs.username = firebaseUser.displayName ?: ""
+
+            // Login to Kommunicate for Experia chatbot
+            KommunicateHelper.loginUser(
+                context = applicationContext,
+                displayName = firebaseUser.displayName ?: "Expectr User",
+                onSuccess = { android.util.Log.d("MainActivity", "Kommunicate login success") },
+                onFailure = { err -> android.util.Log.e("MainActivity", "Kommunicate login failed: $err") }
+            )
         }
 
         val db = AppDatabase.getDatabase(applicationContext)
@@ -240,6 +249,13 @@ fun AppNavigation(
                     authPrefs.isLoggedIn = true
                     authPrefs.email = email
                     authPrefs.username = FirebaseAuth.getInstance().currentUser?.displayName ?: ""
+
+                    // Login to Kommunicate for Experia chatbot
+                    KommunicateHelper.loginUser(
+                        context = navController.context,
+                        displayName = FirebaseAuth.getInstance().currentUser?.displayName ?: "Expectr User"
+                    )
+
                     navController.navigate("home") {
                         popUpTo("login") { inclusive = true }
                     }
@@ -255,6 +271,13 @@ fun AppNavigation(
                     authPrefs.isLoggedIn = true
                     authPrefs.username = username
                     authPrefs.email = email
+
+                    // Login to Kommunicate for Experia chatbot
+                    KommunicateHelper.loginUser(
+                        context = navController.context,
+                        displayName = username
+                    )
+
                     navController.navigate("home") {
                         popUpTo("login") { inclusive = true }
                     }
@@ -263,6 +286,7 @@ fun AppNavigation(
             )
         }
         composable("home") {
+            val context = androidx.compose.ui.platform.LocalContext.current
             HomeScreen(
                 viewModel = homeViewModel,
                 onScoreClick = { navController.navigate("score") },
@@ -276,6 +300,9 @@ fun AppNavigation(
                     navController.navigate("login") {
                         popUpTo(0) { inclusive = true }
                     }
+                },
+                onChatClick = {
+                    KommunicateHelper.openChat(context)
                 }
             )
         }

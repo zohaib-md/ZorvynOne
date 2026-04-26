@@ -108,5 +108,8 @@ dependencies {
 
     // --- Coroutines Play Services (for Task.await()) ---
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
+    // --- Kommunicate Chat SDK (Experia Bot) ---
+    implementation("io.kommunicate.sdk:kommunicateui:2.14.5")
 }
 
