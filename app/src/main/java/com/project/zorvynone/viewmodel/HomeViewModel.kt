@@ -360,7 +360,16 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
     }
 
     fun addTransaction(amount: Int, isIncome: Boolean, category: String, dateMillis: Long, note: String?) {
-        val icon = when(category) { "Food" -> IconType.FOOD; "Salary" -> IconType.SALARY; else -> IconType.DEFAULT }
+        val icon = when(category.lowercase()) {
+            "food" -> IconType.FOOD
+            "café", "cafe", "coffee" -> IconType.CAFE
+            "shopping" -> IconType.SHOPPING
+            "transport", "transportation", "travel", "uber", "cab" -> IconType.TRANSPORT
+            "housing", "rent", "home", "bills", "utilities" -> IconType.HOUSING
+            "salary", "income", "freelance" -> IconType.SALARY
+            "wallet", "transfer" -> IconType.WALLET
+            else -> IconType.DEFAULT
+        }
         viewModelScope.launch { dao.insertTransaction(Transaction(0, note ?: category, category, amount, isIncome, category, dateMillis, note, icon)) }
     }
     fun deleteTransaction(t: Transaction) = viewModelScope.launch { dao.deleteTransaction(t) }

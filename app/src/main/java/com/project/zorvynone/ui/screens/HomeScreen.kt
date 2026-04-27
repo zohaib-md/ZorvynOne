@@ -970,16 +970,20 @@ fun SwipeableTransactionItem(txn: Transaction, onDelete: () -> Unit) {
                 IconType.SALARY -> Icons.Default.Payments
                 IconType.DEFAULT -> Icons.Default.Receipt
             }
-            val tint = if (txn.isIncome) ZorvynGreen else ZorvynRed
             val sign = if (txn.isIncome) "+" else "-"
             val formattedAmt = NumberFormat.getNumberInstance(Locale("en", "IN")).format(txn.amount)
-            TransactionItem(icon = iconVec, iconTint = tint, title = txn.title, subtitle = txn.subtitle, amount = "$sign₹$formattedAmt", isIncome = txn.isIncome)
+            TransactionItem(icon = iconVec, title = txn.title, subtitle = txn.subtitle, amount = "$sign₹$formattedAmt", isIncome = txn.isIncome)
         }
     })
 }
 
 @Composable
-fun TransactionItem(icon: ImageVector, iconTint: Color, title: String, subtitle: String, amount: String, isIncome: Boolean) {
+fun TransactionItem(icon: ImageVector, title: String, subtitle: String, amount: String, isIncome: Boolean) {
+    // Premium icon styling — neutral surface with white icon, CRED-style
+    val iconSurface = Color(0xFF0D0F12)
+    val iconBorder = Color.White.copy(alpha = 0.08f)
+    val iconTintColor = Color.White.copy(alpha = 0.85f)
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -989,11 +993,20 @@ fun TransactionItem(icon: ImageVector, iconTint: Color, title: String, subtitle:
             modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Premium icon container — dark surface, subtle border, white icon
             Box(
-                modifier = Modifier.size(48.dp).background(iconTint.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(iconSurface, RoundedCornerShape(14.dp))
+                    .border(1.dp, iconBorder, RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(24.dp))
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTintColor,
+                    modifier = Modifier.size(22.dp)
+                )
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -1001,17 +1014,18 @@ fun TransactionItem(icon: ImageVector, iconTint: Color, title: String, subtitle:
                     text = title,
                     color = TextPrimary,
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(subtitle, color = TextSecondary.copy(alpha = 0.8f), fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(subtitle, color = TextSecondary.copy(alpha = 0.6f), fontSize = 13.sp)
             }
         }
 
         Spacer(modifier = Modifier.width(16.dp))
 
+        // Only the amount stays colored
         Text(
             text = amount,
             color = if (isIncome) ZorvynGreen else ZorvynRed,

@@ -3,6 +3,7 @@ package com.project.zorvynone.ui.screens
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -187,6 +188,11 @@ fun TransactionsScreen(viewModel: HomeViewModel, onNavigateHome: () -> Unit, onN
                             val sign = if (txn.isIncome) "+" else "-"
                             val formattedAmt = NumberFormat.getNumberInstance(Locale("en", "IN")).format(txn.amount)
 
+                            // Premium CRED-style icon colors
+                            val iconSurface = Color(0xFF0D0F12)
+                            val iconBorder = Color.White.copy(alpha = 0.08f)
+                            val iconTintColor = Color.White.copy(alpha = 0.85f)
+
                             // Using the same TransactionItem look from HomeScreen
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
@@ -197,15 +203,16 @@ fun TransactionsScreen(viewModel: HomeViewModel, onNavigateHome: () -> Unit, onN
                                     Box(
                                         modifier = Modifier
                                             .size(40.dp)
-                                            .background(tint.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
+                                            .background(iconSurface, RoundedCornerShape(12.dp))
+                                            .border(1.dp, iconBorder, RoundedCornerShape(12.dp)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(imageVector = iconVec, contentDescription = txn.title, tint = tint, modifier = Modifier.size(20.dp))
+                                        Icon(imageVector = iconVec, contentDescription = txn.title, tint = iconTintColor, modifier = Modifier.size(20.dp))
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
                                         Text(text = txn.title, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                                        Text(text = txn.subtitle, color = TextSecondary, fontSize = 12.sp)
+                                        Text(text = txn.subtitle, color = TextSecondary.copy(alpha = 0.6f), fontSize = 12.sp)
                                     }
                                 }
                                 Text(
