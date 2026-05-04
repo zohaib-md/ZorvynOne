@@ -9,6 +9,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -434,7 +437,7 @@ fun ExpectrBranding(onSignOut: () -> Unit = {}) {
         ?: userEmail.firstOrNull()?.uppercase()
         ?: "U"
 
-    var showMenu by remember { mutableStateOf(false) }
+    var showSidebar by remember { mutableStateOf(false) }
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -445,69 +448,313 @@ fun ExpectrBranding(onSignOut: () -> Unit = {}) {
             letterSpacing = (-1).sp
         )
 
-        Box {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(Color(0xFF1C2238), CircleShape)
-                    .border(1.dp, TextSecondary.copy(alpha = 0.2f), CircleShape)
-                    .clickable { showMenu = true },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(initial, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        // Profile avatar — opens sidebar
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(Color(0xFF1C2238), CircleShape)
+                .border(1.dp, TextSecondary.copy(alpha = 0.2f), CircleShape)
+                .clickable { showSidebar = true },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(initial, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
+    }
+
+    // --- Premium Gliding Sidebar ---
+    PremiumSidebar(
+        isOpen = showSidebar,
+        onDismiss = { showSidebar = false },
+        displayName = displayName,
+        userEmail = userEmail,
+        initial = initial,
+        onSignOut = {
+            showSidebar = false
+            onSignOut()
+        }
+    )
+}
+
+@Composable
+fun PremiumSidebar(
+    isOpen: Boolean,
+    onDismiss: () -> Unit,
+    displayName: String,
+    userEmail: String,
+    initial: String,
+    onSignOut: () -> Unit
+) {
+    val premiumGold = Color(0xFFE5C158)
+    val sidebarWidth = 300.dp
+
+    // Slide animation — spring physics
+    val offsetX by animateDpAsState(
+        targetValue = if (isOpen) 0.dp else sidebarWidth + 20.dp,
+        animationSpec = spring(
+            dampingRatio = 0.82f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "sidebar_slide"
+    )
+
+    // Overlay dim animation
+    val overlayAlpha by animateFloatAsState(
+        targetValue = if (isOpen) 0.55f else 0f,
+        animationSpec = tween(300),
+        label = "overlay_dim"
+    )
+
+    if (isOpen || offsetX < sidebarWidth + 15.dp) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // --- Dim overlay ---
+            if (overlayAlpha > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = overlayAlpha))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onDismiss() }
+                )
             }
 
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false },
-                containerColor = ZorvynSurface
+            // --- Sidebar panel ---
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(sidebarWidth)
+                    .align(Alignment.CenterEnd)
+                    .offset(x = offsetX)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color(0xFF111418), Color(0xFF0C0E12))
+                        ),
+                        RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                premiumGold.copy(alpha = 0.15f),
+                                Color.White.copy(alpha = 0.05f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
+                    )
             ) {
-                // User info header
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    if (displayName.isNotBlank()) {
-                        Text(displayName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp)
+                        .padding(top = 60.dp, bottom = 32.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        // --- Close button ---
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(Color.White.copy(alpha = 0.06f), CircleShape)
+                                    .clickable { onDismiss() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Close",
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(32.dp))
+
+                        // --- Profile section ---
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Large avatar
+                            Box(
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .background(
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                premiumGold.copy(alpha = 0.2f),
+                                                Color(0xFF1C2238)
+                                            )
+                                        ),
+                                        CircleShape
+                                    )
+                                    .border(
+                                        2.dp,
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                premiumGold.copy(alpha = 0.5f),
+                                                premiumGold.copy(alpha = 0.1f)
+                                            )
+                                        ),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    initial,
+                                    color = premiumGold,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 28.sp
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            if (displayName.isNotBlank()) {
+                                Text(
+                                    displayName,
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                            Text(
+                                userEmail,
+                                color = TextSecondary.copy(alpha = 0.7f),
+                                fontSize = 13.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(36.dp))
+
+                        // --- Divider ---
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
                     }
-                    Text(userEmail, color = TextSecondary, fontSize = 12.sp)
+
+                    // --- Sign out at bottom ---
+                    Column {
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                        Spacer(modifier = Modifier.height(16.dp))
+                        SidebarMenuItem(
+                            icon = Icons.Default.Logout,
+                            label = "Sign Out",
+                            tint = ZorvynRed,
+                            onClick = onSignOut
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "expectr v1.0",
+                            color = TextSecondary.copy(alpha = 0.3f),
+                            fontSize = 11.sp,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
-                HorizontalDivider(color = TextSecondary.copy(alpha = 0.15f))
-                DropdownMenuItem(
-                    text = { Text("Sign Out", color = ZorvynRed, fontWeight = FontWeight.Medium) },
-                    onClick = {
-                        showMenu = false
-                        onSignOut()
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Default.Logout, contentDescription = null, tint = ZorvynRed, modifier = Modifier.size(18.dp))
-                    }
-                )
             }
         }
     }
 }
 
 @Composable
+private fun SidebarMenuItem(
+    icon: ImageVector,
+    label: String,
+    tint: Color = TextSecondary.copy(alpha = 0.8f),
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onClick() }
+            .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = label,
+            color = tint,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
 fun PremiumHomeHeader() {
     val premiumGold = Color(0xFFE5C158)
+
     val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-    val greeting = when (currentHour) {
-        in 5..11 -> "GOOD MORNING"
-        in 12..16 -> "GOOD AFTERNOON"
-        in 17..20 -> "GOOD EVENING"
-        else -> "GOOD NIGHT"
+    val greetingWord = when (currentHour) {
+        in 5..11 -> "good morning"
+        in 12..16 -> "good afternoon"
+        in 17..20 -> "good evening"
+        else -> "good night"
     }
 
+    // Personalize with Firebase user name
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    val firstName = firebaseUser?.displayName
+        ?.split(" ")?.firstOrNull()?.replaceFirstChar { it.uppercase() }
+        ?: "there"
+
     Column(modifier = Modifier.fillMaxWidth()) {
-        Box(modifier = Modifier.border(1.dp, premiumGold.copy(alpha = 0.4f), RoundedCornerShape(20.dp)).background(premiumGold.copy(alpha = 0.05f), RoundedCornerShape(20.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) {
-            Text(text = "• $greeting", color = premiumGold, fontSize = 11.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(buildAnnotatedString {
-            withStyle(SpanStyle(color = TextPrimary)) { append("Your money,\n") }
-            withStyle(SpanStyle(color = premiumGold)) { append("fully in focus.") }
-        }, fontSize = 36.sp, fontWeight = FontWeight.Black, lineHeight = 40.sp, letterSpacing = (-1.5).sp)
+        // --- Personalized greeting — Playfair Display Bold ---
+        Text(
+            text = "Hi $firstName, $greetingWord",
+            color = Color.White,
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = PlayfairDisplay,
+            letterSpacing = (-0.3).sp
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- Hero headline — Playfair Display Bold ---
+        Text(
+            text = buildAnnotatedString {
+                withStyle(SpanStyle(color = TextPrimary)) { append("Your money,\n") }
+                withStyle(SpanStyle(color = premiumGold)) { append("fully in focus.") }
+            },
+            fontSize = 36.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = PlayfairDisplay,
+            lineHeight = 42.sp,
+            letterSpacing = (-0.5).sp
+        )
+
         Spacer(modifier = Modifier.height(12.dp))
-        Text("Every rupee tracked. Every habit scored.\n", color = TextSecondary.copy(alpha = 0.7f), fontSize = 15.sp, lineHeight = 22.sp)
-        Text("Your financial story, told clearly.", color = TextSecondary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+
+        // --- Tagline ---
+        Text(
+            "Every rupee tracked. Every habit scored.",
+            color = TextSecondary.copy(alpha = 0.6f),
+            fontSize = 14.sp,
+            lineHeight = 20.sp
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "Your financial story, told clearly.",
+            color = TextSecondary.copy(alpha = 0.8f),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
@@ -1124,13 +1371,191 @@ fun ExperiaChatCard(onClick: () -> Unit) {
 }
 
 @Composable
-fun BottomNavBar(currentRoute: String = "home", onHomeClick: () -> Unit = {}, onTxnsClick: () -> Unit = {}, onAddClick: () -> Unit = {}, onInsightsClick: () -> Unit = {}, onScoreNavClick: () -> Unit = {}) {
+fun BottomNavBar(
+    currentRoute: String = "home",
+    onHomeClick: () -> Unit = {},
+    onTxnsClick: () -> Unit = {},
+    onAddClick: () -> Unit = {},
+    onInsightsClick: () -> Unit = {},
+    onScoreNavClick: () -> Unit = {}
+) {
     val premiumGold = Color(0xFFE5C158)
-    NavigationBar(containerColor = ZorvynBackground, contentColor = TextSecondary, tonalElevation = 0.dp, modifier = Modifier.border(width = 1.dp, color = ZorvynSurface, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))) {
-        NavigationBarItem(icon = { Icon(Icons.Default.Home, contentDescription = "Home") }, label = { Text("HOME", fontSize = 10.sp, fontWeight = FontWeight.Bold) }, selected = currentRoute == "home", onClick = onHomeClick, colors = NavigationBarItemDefaults.colors(selectedIconColor = premiumGold, selectedTextColor = premiumGold, indicatorColor = ZorvynBackground))
-        NavigationBarItem(icon = { Icon(Icons.Default.List, contentDescription = "Txns") }, label = { Text("TXNS", fontSize = 10.sp, fontWeight = FontWeight.Medium) }, selected = currentRoute == "txns", onClick = onTxnsClick, colors = NavigationBarItemDefaults.colors(selectedIconColor = premiumGold, selectedTextColor = premiumGold, indicatorColor = ZorvynBackground))
-        NavigationBarItem(icon = { Icon(Icons.Default.AddCircleOutline, contentDescription = "Add") }, label = { Text("ADD", fontSize = 10.sp, fontWeight = FontWeight.Medium) }, selected = currentRoute == "add", onClick = onAddClick, colors = NavigationBarItemDefaults.colors(selectedIconColor = premiumGold, selectedTextColor = premiumGold, indicatorColor = ZorvynBackground))
-        NavigationBarItem(icon = { Icon(Icons.Default.ShowChart, contentDescription = "Insights") }, label = { Text("INSIGHTS", fontSize = 10.sp, fontWeight = FontWeight.Medium) }, selected = currentRoute == "insights", onClick = onInsightsClick, colors = NavigationBarItemDefaults.colors(selectedIconColor = premiumGold, selectedTextColor = premiumGold, indicatorColor = ZorvynBackground))
-        NavigationBarItem(icon = { Icon(Icons.Default.TrackChanges, contentDescription = "Score") }, label = { Text("SCORE", fontSize = 10.sp, fontWeight = FontWeight.Medium) }, selected = currentRoute == "score", onClick = onScoreNavClick, colors = NavigationBarItemDefaults.colors(selectedIconColor = premiumGold, selectedTextColor = premiumGold, indicatorColor = ZorvynBackground))
+
+    data class NavItem(
+        val route: String,
+        val icon: ImageVector,
+        val label: String,
+        val onClick: () -> Unit
+    )
+
+    val items = listOf(
+        NavItem("home", Icons.Default.Home, "HOME", onHomeClick),
+        NavItem("txns", Icons.Default.Receipt, "TXNS", onTxnsClick),
+        NavItem("add", Icons.Default.AddCircleOutline, "ADD", onAddClick),
+        NavItem("insights", Icons.Default.BarChart, "INSIGHTS", onInsightsClick),
+        NavItem("score", Icons.Default.TrackChanges, "SCORE", onScoreNavClick)
+    )
+
+    val selectedIndex = items.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF0A0C10))
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.08f),
+                        Color.White.copy(alpha = 0.02f)
+                    )
+                ),
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+            )
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 10.dp)
+        ) {
+            val tabWidth = maxWidth / items.size
+
+            // --- Gliding capsule indicator ---
+            val indicatorOffset by animateDpAsState(
+                targetValue = tabWidth * selectedIndex,
+                animationSpec = spring(
+                    dampingRatio = 0.7f,
+                    stiffness = 300f
+                ),
+                label = "capsule_glide"
+            )
+
+            // Glow behind capsule
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(tabWidth)
+                    .height(52.dp)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                premiumGold.copy(alpha = 0.08f),
+                                Color.Transparent
+                            )
+                        ),
+                        RoundedCornerShape(18.dp)
+                    )
+            )
+
+            // Capsule surface
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(tabWidth)
+                    .height(52.dp)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFF1A1E26),
+                                Color(0xFF14171D)
+                            )
+                        ),
+                        RoundedCornerShape(16.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                premiumGold.copy(alpha = 0.3f),
+                                premiumGold.copy(alpha = 0.08f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+            )
+
+            // --- Tab items ---
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                items.forEachIndexed { index, item ->
+                    val isSelected = index == selectedIndex
+
+                    // Icon floats up when selected
+                    val iconOffsetY by animateDpAsState(
+                        targetValue = if (isSelected) (-2).dp else 0.dp,
+                        animationSpec = spring(
+                            dampingRatio = 0.65f,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "icon_lift_$index"
+                    )
+
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.1f else 0.85f,
+                        animationSpec = spring(
+                            dampingRatio = 0.65f,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "icon_scale_$index"
+                    )
+
+                    val iconColor by animateColorAsState(
+                        targetValue = if (isSelected) premiumGold else Color.White.copy(alpha = 0.35f),
+                        animationSpec = tween(220),
+                        label = "icon_color_$index"
+                    )
+
+                    val labelAlpha by animateFloatAsState(
+                        targetValue = if (isSelected) 1f else 0f,
+                        animationSpec = tween(if (isSelected) 200 else 100),
+                        label = "label_alpha_$index"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { item.onClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.offset(y = iconOffsetY)
+                        ) {
+                            Icon(
+                                imageVector = item.icon,
+                                contentDescription = item.label,
+                                tint = iconColor,
+                                modifier = Modifier
+                                    .size(21.dp)
+                                    .scale(iconScale)
+                            )
+                            // Micro label under selected icon
+                            if (labelAlpha > 0.01f) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = item.label,
+                                    color = premiumGold.copy(alpha = labelAlpha),
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 1.2.sp,
+                                    modifier = Modifier.graphicsLayer(alpha = labelAlpha)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
