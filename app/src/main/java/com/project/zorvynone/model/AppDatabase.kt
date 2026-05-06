@@ -3,14 +3,13 @@ package com.project.zorvynone.model
 import android.content.Context
 import androidx.room.*
 
-// We include all three entities: Transaction, SavingsGoal, and UserFinancialProfile
 @Database(
     entities = [
         Transaction::class,
         SavingsGoal::class,
-        UserFinancialProfile::class
+        SavingsDeposit::class
     ],
-    version = 4, // Bumped to 4 to accommodate the new user profile and goals
+    version = 5, // Bumped: replaced UserFinancialProfile with SavingsDeposit, revamped SavingsGoal
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

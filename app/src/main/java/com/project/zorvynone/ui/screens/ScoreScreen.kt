@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.project.zorvynone.ui.theme.*
+import com.project.zorvynone.model.SavingsGoal
 import com.project.zorvynone.viewmodel.HomeViewModel
 import java.util.Locale
 
@@ -217,7 +218,7 @@ fun ScoreScreen(
                     }
                 }
             } else {
-                SavingsEngineDashboard(viewModel = viewModel)
+                SmartVaultsContent(viewModel = viewModel)
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -240,103 +241,139 @@ fun ScoreScreen(
     }
 }
 
-// ── AI ACHIEVEMENT NAVIGATOR (SAVINGS TAB) ──────────────────────────────
+// ── SMART VAULTS (SAVINGS TAB) ──────────────────────────────────────
 
 @Composable
-fun SavingsEngineDashboard(viewModel: HomeViewModel) {
-    val profile by viewModel.userProfile.collectAsStateWithLifecycle()
-    val isGeneratingPlan by viewModel.isScoreLoading.collectAsStateWithLifecycle()
-    val progress by viewModel.realGoalCoverage.collectAsStateWithLifecycle()
-    val briefing by viewModel.aiMissionBriefing.collectAsStateWithLifecycle()
+fun SmartVaultsContent(viewModel: HomeViewModel) {
+    val vaults by viewModel.allVaults.collectAsStateWithLifecycle()
+    val totalRoundUp by viewModel.totalRoundUpSavings.collectAsStateWithLifecycle()
+    val totalSaved by viewModel.totalAllSavings.collectAsStateWithLifecycle()
+    val streak by viewModel.currentStreak.collectAsStateWithLifecycle()
+    val longest by viewModel.longestStreak.collectAsStateWithLifecycle()
+    val budget by viewModel.dailyBudget.collectAsStateWithLifecycle()
+    val spent by viewModel.todaySpent.collectAsStateWithLifecycle()
+    val underBudget by viewModel.isUnderBudgetToday.collectAsStateWithLifecycle()
+    val advice by viewModel.savingsCoachAdvice.collectAsStateWithLifecycle()
+    val coachLoading by viewModel.isSavingsCoachLoading.collectAsStateWithLifecycle()
     val premiumGold = Color(0xFFE5C158)
+    var showCreate by remember { mutableStateOf(false) }
+    var depositId by remember { mutableStateOf(-1) }
+    var depositAmt by remember { mutableStateOf("") }
 
-    var isEditing by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { viewModel.checkAndUpdateStreak() }
 
-    if (profile == null || isEditing) {
-        SetupAchievementUI(onSave = { s, f, n, t, m ->
-            viewModel.updateProfile(s, f, n, t, m)
-            // Triggers AI Mission Briefing using True Surplus
-            viewModel.generateAchievementPlan("")
-            isEditing = false
-        })
-    } else {
-        Column {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C2238)),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
-            ) {
-                Column(modifier = Modifier.padding(24.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("AI ACHIEVEMENT NAVIGATOR", color = premiumGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
-                        if (isGeneratingPlan) CircularProgressIndicator(color = premiumGold, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-                    }
+    Column {
+        SavingsOverview(totalSaved, totalRoundUp)
+        Spacer(Modifier.height(20.dp))
+        StreakDashboard(streak, longest, viewModel.getStreakMilestone(streak), budget, spent, underBudget) { viewModel.setDailyBudget(it) }
+        Spacer(Modifier.height(20.dp))
 
-                    Spacer(Modifier.height(20.dp))
-                    Text(text = profile?.goalName?.uppercase() ?: "YOUR GOAL", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    Text(text = "Target: ₹${String.format("%,.0f", profile?.targetAmount)} • Timeline: ${profile?.targetMonths} Months", color = Color.White.copy(0.6f), fontSize = 13.sp)
+        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+            Text("YOUR VAULTS", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Text("${vaults.size} active", color = premiumGold, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(12.dp))
 
-                    Spacer(Modifier.height(24.dp))
-                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(8.dp), color = premiumGold, trackColor = Color.White.copy(0.1f), strokeCap = StrokeCap.Round)
-
-                    Spacer(Modifier.height(12.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${(progress * 100).toInt()}% Net Savings Coverage", color = premiumGold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("₹${String.format("%,.0f", profile?.targetAmount)}", color = Color.White.copy(0.3f), fontSize = 12.sp)
-                    }
-                }
+        if (vaults.isEmpty()) {
+            EmptyVaultCard { showCreate = true }
+        } else {
+            vaults.forEach { v ->
+                VaultCard(v, depositId == v.id, depositAmt,
+                    onAmtChange = { depositAmt = it },
+                    onToggle = { depositId = if (depositId == v.id) -1 else v.id; depositAmt = "" },
+                    onDeposit = { depositAmt.toDoubleOrNull()?.let { a -> if (a > 0) { viewModel.depositToVault(v.id, a); depositId = -1; depositAmt = "" } } },
+                    onRoundUp = { viewModel.setDefaultRoundUpVault(v.id) },
+                    onDelete = { viewModel.deleteVault(v) })
+                Spacer(Modifier.height(12.dp))
             }
+        }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Box(Modifier.fillMaxWidth().background(ZorvynSurface, RoundedCornerShape(20.dp)).padding(20.dp)) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AutoAwesome, null, tint = premiumGold, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("MISSION BRIEFING", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    if (isGeneratingPlan) {
-                        repeat(3) { Box(Modifier.fillMaxWidth().height(14.dp).padding(vertical = 4.dp).background(scoreShimmerBrush(), RoundedCornerShape(4.dp))) }
-                    } else {
-                        Text(text = briefing, color = TextSecondary, fontSize = 14.sp, lineHeight = 22.sp)
-                    }
-                }
+        Spacer(Modifier.height(12.dp))
+        if (showCreate) {
+            CreateVaultForm(onCreate = { t, a, d, e, r -> viewModel.createVault(t, a, d, e, r); showCreate = false }, onCancel = { showCreate = false })
+        } else {
+            OutlinedButton(onClick = { showCreate = true }, Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, premiumGold.copy(0.3f))) {
+                Icon(Icons.Default.Add, null, tint = premiumGold, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Create New Vault", color = premiumGold, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
+        }
+        Spacer(Modifier.height(24.dp))
+        SavingsCoachCard(advice, coachLoading) { viewModel.generateSavingsCoachAdvice() }
+    }
+}
 
-            Spacer(modifier = Modifier.height(20.dp))
-            Box(Modifier.fillMaxWidth().background(ZorvynSurface, RoundedCornerShape(20.dp)).padding(16.dp).clickable { isEditing = true }) {
-                Text("RECONFIGURE ARCHITECT", color = premiumGold, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+@Composable
+fun SavingsOverview(totalSaved: Double, roundUp: Double) {
+    val premiumGold = Color(0xFFE5C158)
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1F36)), border = BorderStroke(1.dp, premiumGold.copy(0.15f))) {
+        Row(Modifier.fillMaxWidth().padding(20.dp), Arrangement.SpaceEvenly) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("TOTAL SAVED", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("₹${String.format("%,.0f", totalSaved)}", color = ZorvynGreen, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            }
+            Box(Modifier.width(1.dp).height(50.dp).background(TextSecondary.copy(0.15f)))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("ROUND-UPS", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("₹${String.format("%,.0f", roundUp)}", color = premiumGold, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-fun SetupAchievementUI(onSave: (Double, Double, String, Double, Int) -> Unit) {
-    var salary by remember { mutableStateOf("") }; var fixed by remember { mutableStateOf("") }
-    var goalName by remember { mutableStateOf("") }; var target by remember { mutableStateOf("") }; var months by remember { mutableStateOf("5") }
+fun StreakDashboard(streak: Int, longest: Int, milestone: String?, budget: Double, spent: Int, underBudget: Boolean, onSetBudget: (Double) -> Unit) {
+    val premiumGold = Color(0xFFE5C158)
+    var editing by remember { mutableStateOf(false) }
+    var budgetInput by remember { mutableStateOf("") }
 
-    Column(Modifier.fillMaxWidth().background(ZorvynSurface, RoundedCornerShape(24.dp)).padding(24.dp)) {
-        Text("Savings Architect", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text("Define your path to achievement.", color = TextSecondary, fontSize = 13.sp)
-        Spacer(Modifier.height(24.dp))
-        OutlinedTextField(value = goalName, onValueChange = { goalName = it }, label = { Text("Goal (e.g. iPhone)") }, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(value = target, onValueChange = { target = it }, label = { Text("Target (₹)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-            OutlinedTextField(value = months, onValueChange = { months = it }, label = { Text("Months") }, modifier = Modifier.weight(0.6f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-        }
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(value = salary, onValueChange = { salary = it }, label = { Text("Monthly Salary (₹)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(value = fixed, onValueChange = { fixed = it }, label = { Text("Fixed Bills (₹)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-        Spacer(Modifier.height(24.dp))
-        Button(onClick = { onSave(salary.toDoubleOrNull() ?: 0.0, fixed.toDoubleOrNull() ?: 0.0, goalName, target.toDoubleOrNull() ?: 0.0, months.toIntOrNull() ?: 1) }, modifier = Modifier.fillMaxWidth().height(54.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5C158)), shape = RoundedCornerShape(12.dp)) {
-            Text("Launch Navigator", color = Color.Black, fontWeight = FontWeight.Bold)
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = ZorvynSurface), border = BorderStroke(1.dp, TextSecondary.copy(0.1f))) {
+        Column(Modifier.padding(20.dp)) {
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                Text("SAVINGS STREAK", color = premiumGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                if (milestone != null) Box(Modifier.background(premiumGold.copy(0.1f), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) { Text(milestone, fontSize = 12.sp, color = premiumGold, fontWeight = FontWeight.Bold) }
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceEvenly) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.LocalFireDepartment, null, tint = Color.White, modifier = Modifier.size(28.dp))
+                    Text("$streak", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black)
+                    Text("current", color = TextSecondary, fontSize = 12.sp)
+                }
+                Box(Modifier.width(1.dp).height(70.dp).background(TextSecondary.copy(0.1f)))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.EmojiEvents, null, tint = Color.White, modifier = Modifier.size(28.dp))
+                    Text("$longest", color = premiumGold, fontSize = 36.sp, fontWeight = FontWeight.Black)
+                    Text("longest", color = TextSecondary, fontSize = 12.sp)
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                Text("TODAY'S BUDGET", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Row(Modifier.clickable { editing = !editing }, verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Edit, null, tint = TextSecondary.copy(0.5f), modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("₹${budget.toInt()}", color = TextSecondary, fontSize = 12.sp)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            val prog = if (budget > 0) (spent / budget).toFloat().coerceIn(0f, 1f) else 0f
+            val barCol = if (underBudget) ZorvynGreen else ZorvynRed
+            LinearProgressIndicator(progress = { prog }, modifier = Modifier.fillMaxWidth().height(8.dp), color = barCol, trackColor = Color.White.copy(0.08f), strokeCap = StrokeCap.Round)
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                Text("₹$spent spent", color = barCol, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(if (underBudget) "On track ✓" else "Over budget", color = barCol, fontSize = 12.sp)
+            }
+            if (editing) {
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp), Alignment.CenterVertically) {
+                    OutlinedTextField(value = budgetInput, onValueChange = { budgetInput = it }, placeholder = { Text("New budget") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+                    Button(onClick = { budgetInput.toDoubleOrNull()?.let { onSetBudget(it); editing = false; budgetInput = "" } }, colors = ButtonDefaults.buttonColors(containerColor = premiumGold), shape = RoundedCornerShape(12.dp)) { Text("Set", color = Color.Black, fontWeight = FontWeight.Bold) }
+                }
+            }
         }
     }
 }
@@ -405,4 +442,160 @@ fun HabitCard(habit: ScoreHabit, isAccepted: Boolean, onAccept: () -> Unit, onRe
 @Composable
 fun ShimmerHabitCard() {
     Box(Modifier.fillMaxWidth().height(160.dp).background(ZorvynSurface, RoundedCornerShape(20.dp)))
+}
+
+// ── VAULT ICON MAPPING ──────────────────────────────────────────────
+
+fun vaultIcon(key: String): ImageVector = when (key) {
+    "target" -> Icons.Default.GpsFixed
+    "flight" -> Icons.Default.Flight
+    "phone" -> Icons.Default.Smartphone
+    "home" -> Icons.Default.Home
+    "school" -> Icons.Default.School
+    "diamond" -> Icons.Default.Diamond
+    "car" -> Icons.Default.DirectionsCar
+    "savings" -> Icons.Default.Savings
+    else -> Icons.Default.Savings
+}
+
+// ── VAULT CARD ──────────────────────────────────────────────────────
+
+@Composable
+fun VaultCard(vault: SavingsGoal, isDepositing: Boolean, depositAmt: String, onAmtChange: (String) -> Unit, onToggle: () -> Unit, onDeposit: () -> Unit, onRoundUp: () -> Unit, onDelete: () -> Unit) {
+    val premiumGold = Color(0xFFE5C158)
+    val prog = if (vault.targetAmount > 0) (vault.savedAmount / vault.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
+    val pct = (prog * 100).toInt()
+    var confirmDelete by remember { mutableStateOf(false) }
+
+    Card(Modifier.fillMaxWidth().animateContentSize(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = ZorvynSurface), border = BorderStroke(1.dp, if (vault.isDefaultRoundUpVault) premiumGold.copy(0.4f) else TextSecondary.copy(0.1f))) {
+        Column(Modifier.padding(20.dp)) {
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.Top) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(44.dp).background(Color.White.copy(0.07f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) { Icon(vaultIcon(vault.iconEmoji), null, tint = Color.White, modifier = Modifier.size(22.dp)) }
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(vault.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        if (vault.isDefaultRoundUpVault) Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Bolt, null, tint = premiumGold, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(2.dp)); Text("Round-up vault", color = premiumGold, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                    }
+                }
+                Text("$pct%", color = if (pct >= 100) ZorvynGreen else premiumGold, fontSize = 20.sp, fontWeight = FontWeight.Black)
+            }
+            Spacer(Modifier.height(16.dp))
+            LinearProgressIndicator(progress = { prog }, modifier = Modifier.fillMaxWidth().height(6.dp), color = if (pct >= 100) ZorvynGreen else premiumGold, trackColor = Color.White.copy(0.08f), strokeCap = StrokeCap.Round)
+            Spacer(Modifier.height(8.dp))
+            Text("₹${String.format("%,.0f", vault.savedAmount)} / ₹${String.format("%,.0f", vault.targetAmount)}", color = TextSecondary, fontSize = 13.sp)
+            Spacer(Modifier.height(16.dp))
+
+            Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onToggle, Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = if (isDepositing) premiumGold.copy(0.15f) else ZorvynBackground), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, premiumGold.copy(0.3f)), contentPadding = PaddingValues(8.dp)) {
+                    Icon(Icons.Default.Add, null, tint = premiumGold, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Deposit", color = premiumGold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                if (!vault.isDefaultRoundUpVault) {
+                    OutlinedButton(onClick = onRoundUp, Modifier.weight(1f), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, TextSecondary.copy(0.2f)), contentPadding = PaddingValues(8.dp)) {
+                        Icon(Icons.Default.Bolt, null, tint = TextSecondary, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp)); Text("Set Round-Up", color = TextSecondary, fontSize = 12.sp)
+                    }
+                }
+                IconButton(onClick = { confirmDelete = true }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Default.Delete, null, tint = ZorvynRed.copy(0.6f), modifier = Modifier.size(18.dp))
+                }
+            }
+
+            if (isDepositing) {
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp), Alignment.CenterVertically) {
+                    OutlinedTextField(value = depositAmt, onValueChange = onAmtChange, placeholder = { Text("Amount") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+                    Button(onClick = onDeposit, colors = ButtonDefaults.buttonColors(containerColor = ZorvynGreen), shape = RoundedCornerShape(12.dp)) { Text("Add", color = Color.Black, fontWeight = FontWeight.Bold) }
+                }
+            }
+        }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(onDismissRequest = { confirmDelete = false }, confirmButton = { TextButton(onClick = { onDelete(); confirmDelete = false }) { Text("Delete", color = ZorvynRed) } }, dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }, title = { Text("Delete Vault?", color = Color.White) }, text = { Text("This will permanently remove \"${vault.title}\" and all its saved progress.", color = TextSecondary) }, containerColor = ZorvynSurface)
+    }
+}
+
+@Composable
+fun EmptyVaultCard(onCreate: () -> Unit) {
+    val premiumGold = Color(0xFFE5C158)
+    Card(Modifier.fillMaxWidth().clickable { onCreate() }, shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = ZorvynSurface), border = BorderStroke(1.dp, premiumGold.copy(0.15f))) {
+        Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size(56.dp).background(Color.White.copy(0.07f), RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.AccountBalance, null, tint = Color.White, modifier = Modifier.size(28.dp)) }
+            Spacer(Modifier.height(12.dp))
+            Text("No vaults yet", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text("Create your first savings vault to start tracking goals.", color = TextSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(16.dp))
+            Text("Tap to create →", color = premiumGold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun CreateVaultForm(onCreate: (String, Double, Long, String, Int) -> Unit, onCancel: () -> Unit) {
+    val premiumGold = Color(0xFFE5C158)
+    var title by remember { mutableStateOf("") }
+    var target by remember { mutableStateOf("") }
+    var emoji by remember { mutableStateOf("target") }
+    var months by remember { mutableStateOf("6") }
+    var roundUp by remember { mutableStateOf("10") }
+    val iconOptions = listOf("target" to Icons.Default.GpsFixed, "flight" to Icons.Default.Flight, "phone" to Icons.Default.Smartphone, "home" to Icons.Default.Home, "school" to Icons.Default.School, "diamond" to Icons.Default.Diamond, "car" to Icons.Default.DirectionsCar, "savings" to Icons.Default.Savings)
+
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = ZorvynSurface), border = BorderStroke(1.dp, premiumGold.copy(0.2f))) {
+        Column(Modifier.padding(20.dp)) {
+            Text("NEW VAULT", color = premiumGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { iconOptions.forEach { (key, ic) -> Box(Modifier.size(40.dp).background(if (emoji == key) premiumGold.copy(0.15f) else Color.White.copy(0.05f), RoundedCornerShape(10.dp)).clickable { emoji = key }, contentAlignment = Alignment.Center) { Icon(ic, null, tint = if (emoji == key) Color.White else Color.White.copy(0.5f), modifier = Modifier.size(20.dp)) } } }
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Vault name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = target, onValueChange = { target = it }, label = { Text("Target ₹") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+                OutlinedTextField(value = months, onValueChange = { months = it }, label = { Text("Months") }, modifier = Modifier.weight(0.6f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(value = roundUp, onValueChange = { roundUp = it }, label = { Text("Round-up rule ₹ (0=off)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onCancel, Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Text("Cancel") }
+                Button(onClick = {
+                    val t = target.toDoubleOrNull() ?: return@Button
+                    val m = months.toIntOrNull() ?: 6
+                    val dl = System.currentTimeMillis() + (m.toLong() * 30 * 24 * 60 * 60 * 1000)
+                    onCreate(title.ifBlank { "My Vault" }, t, dl, emoji, roundUp.toIntOrNull() ?: 10)
+                }, Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = premiumGold), shape = RoundedCornerShape(12.dp)) { Text("Create", color = Color.Black, fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
+}
+
+@Composable
+fun SavingsCoachCard(advice: String, isLoading: Boolean, onRefresh: () -> Unit) {
+    val premiumGold = Color(0xFFE5C158)
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF1C2238)), border = BorderStroke(1.dp, Color.White.copy(0.05f))) {
+        Column(Modifier.padding(20.dp)) {
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AutoAwesome, null, tint = Color(0xFFA288E3), modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("AI SAVINGS COACH", color = Color(0xFFA288E3), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                }
+                if (isLoading) CircularProgressIndicator(color = Color(0xFFA288E3), modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+            }
+            Spacer(Modifier.height(16.dp))
+            if (isLoading) {
+                repeat(3) { Box(Modifier.fillMaxWidth().height(14.dp).padding(vertical = 4.dp).background(scoreShimmerBrush(), RoundedCornerShape(4.dp))) }
+            } else {
+                Text(advice, color = TextSecondary, fontSize = 14.sp, lineHeight = 22.sp)
+            }
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onRefresh, Modifier.fillMaxWidth().height(44.dp), enabled = !isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2045)), shape = RoundedCornerShape(12.dp)) {
+                Icon(Icons.Default.Refresh, null, tint = Color(0xFFA288E3), modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Get Fresh Advice", color = Color(0xFFA288E3), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
 }
