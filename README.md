@@ -1,4 +1,4 @@
-# ✦ ZorvynOne | Next-Gen Personal Finance
+# ✦ Expectr | Next-Gen Personal Finance
 
 > A premium, AI-powered personal finance and habit-tracking Android application built entirely with Jetpack Compose. 
 
