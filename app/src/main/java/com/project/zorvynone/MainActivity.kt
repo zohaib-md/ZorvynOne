@@ -303,12 +303,16 @@ fun AppNavigation(
                 },
                 onChatClick = {
                     KommunicateHelper.openChat(context)
-                }
+                },
+                onSpendOrSkipClick = { navController.navigate("spend_or_skip") },
+                onBillSplitClick = { navController.navigate("bill_split") }
             )
         }
         composable("transactions") { TransactionsScreen(homeViewModel, onNavigateHome = { navTo("home") }, onNavigateAdd = { navTo("add_transaction") }) }
         composable("insights") { InsightsScreen(homeViewModel, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }) }
         composable("score") { ScoreScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }, onNavigateInsights = { navTo("insights") }) }
         composable("add_transaction") { AddTransactionScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }) }
+        composable("spend_or_skip") { SpendOrSkipScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }) }
+        composable("bill_split") { BillSplitScreen(onNavigateBack = { navController.popBackStack() }) }
     }
 }

@@ -218,7 +218,54 @@ fun ScoreScreen(
                     }
                 }
             } else {
-                SmartVaultsContent(viewModel = viewModel)
+                // Coming Soon placeholder
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = ZorvynSurface),
+                    border = BorderStroke(1.dp, TextSecondary.copy(alpha = 0.1f))
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.Savings,
+                            contentDescription = null,
+                            tint = premiumGold.copy(alpha = 0.4f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "Smart Savings",
+                            color = TextPrimary,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Vaults, round-ups & AI coaching — coming in v2.0",
+                            color = TextSecondary.copy(alpha = 0.6f),
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 20.sp
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(premiumGold.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                "COMING SOON",
+                                color = premiumGold,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 2.sp
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))

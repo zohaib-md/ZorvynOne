@@ -7,7 +7,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.animation.core.animateDpAsState
@@ -65,6 +71,11 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.project.zorvynone.model.IconType
 import com.project.zorvynone.model.Transaction
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.project.zorvynone.R
 import com.project.zorvynone.ui.theme.*
 import com.project.zorvynone.viewmodel.HomeViewModel
 import com.project.zorvynone.KommunicateHelper
@@ -106,7 +117,9 @@ fun HomeScreen(
     onInsightsClick: () -> Unit = {},
     onScoreNavClick: () -> Unit = {},
     onSignOut: () -> Unit = {},
-    onChatClick: () -> Unit = {}
+    onChatClick: () -> Unit = {},
+    onSpendOrSkipClick: () -> Unit = {},
+    onBillSplitClick: () -> Unit = {}
 ) {
     val balance by viewModel.totalBalance.collectAsStateWithLifecycle()
     val income by viewModel.totalIncome.collectAsStateWithLifecycle()
@@ -417,12 +430,93 @@ fun HomeScreen(
                     photoPickerLauncher.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
                 }
             )
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // Experia chatbot is now a FAB — no card here
+            // --- Quick Actions ---
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Spend or Skip card — with Lottie
+                QuickActionCard(
+                    title = "Spend or Skip",
+                    subtitle = "Review & rate your expenses",
+                    gradientColors = listOf(Color(0xFFF59E0B), Color(0xFFEF6C00)),
+                    lottieRes = R.raw.yes_or_no,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onSpendOrSkipClick
+                )
+                // Bill Split card — with Lottie
+                QuickActionCard(
+                    title = "Split Bill",
+                    subtitle = "Fair splits with friends",
+                    gradientColors = listOf(Color(0xFF6366F1), Color(0xFF8B5CF6)),
+                    lottieRes = R.raw.phone_money,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onBillSplitClick
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
 
             RecentTransactionsSection(transactions = transactions, onDelete = { txn -> viewModel.deleteTransaction(txn) })
             Spacer(modifier = Modifier.height(80.dp))
+        }
+    }
+}
+
+@Composable
+fun QuickActionCard(
+    icon: ImageVector? = null,
+    title: String,
+    subtitle: String,
+    gradientColors: List<Color>,
+    lottieRes: Int? = null,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .height(72.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.horizontalGradient(gradientColors))
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (lottieRes != null) {
+                    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(lottieRes))
+                    LottieAnimation(
+                        composition = composition,
+                        iterations = LottieConstants.IterateForever,
+                        modifier = Modifier.size(32.dp)
+                    )
+                } else if (icon != null) {
+                    Icon(icon, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                }
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(subtitle, color = Color.White.copy(0.7f), fontSize = 12.sp)
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                null,
+                tint = Color.White.copy(0.5f),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }
@@ -439,25 +533,103 @@ fun ExpectrBranding(onSignOut: () -> Unit = {}) {
 
     var showSidebar by remember { mutableStateOf(false) }
 
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = "expectr",
-            color = TextPrimary,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = (-1).sp
+    // --- Rotating taglines ---
+    val taglines = remember {
+        listOf(
+            "Every rupee tracked.",
+            "Your financial story.",
+            "Smart habits, real results.",
+            "Money, fully in focus.",
+            "AI-powered insights."
         )
+    }
+    var currentTaglineIndex by remember { mutableIntStateOf(0) }
 
-        // Profile avatar — opens sidebar
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .background(Color(0xFF1C2238), CircleShape)
-                .border(1.dp, TextSecondary.copy(alpha = 0.2f), CircleShape)
-                .clickable { showSidebar = true },
-            contentAlignment = Alignment.Center
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(3000L)
+            currentTaglineIndex = (currentTaglineIndex + 1) % taglines.size
+        }
+    }
+
+    // Animate on index change
+    val taglineAlpha by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = tween(400),
+        label = "tagline_alpha"
+    )
+
+    // --- Shimmer brush for glassy tagline ---
+    val shimmerTransition = rememberInfiniteTransition(label = "tagline_shimmer")
+    val shimmerOffset by shimmerTransition.animateFloat(
+        initialValue = -500f,
+        targetValue = 1500f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer_sweep"
+    )
+
+    val shimmerBrush = Brush.linearGradient(
+        colors = listOf(
+            Color(0xFF8A8A8A),       // muted silver
+            Color(0xFFE5C158),       // gold highlight
+            Color(0xFFFFFFFF),       // bright white flash
+            Color(0xFFE5C158),       // gold
+            Color(0xFF8A8A8A)        // back to silver
+        ),
+        start = Offset(shimmerOffset, 0f),
+        end = Offset(shimmerOffset + 600f, 0f)
+    )
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(initial, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Column {
+                Text(
+                    text = "expectr",
+                    color = TextPrimary,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = (-1).sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                // Animated tagline with shimmer
+                AnimatedContent(
+                    targetState = currentTaglineIndex,
+                    transitionSpec = {
+                        (slideInVertically { it / 2 } + fadeIn(tween(350))) togetherWith
+                                (slideOutVertically { -it / 2 } + fadeOut(tween(200)))
+                    },
+                    label = "tagline_cycle"
+                ) { index ->
+                    Text(
+                        text = taglines[index],
+                        style = LocalTextStyle.current.copy(
+                            brush = shimmerBrush
+                        ),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+
+            // Profile avatar — opens sidebar
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color(0xFF1C2238), CircleShape)
+                    .border(1.dp, TextSecondary.copy(alpha = 0.2f), CircleShape)
+                    .clickable { showSidebar = true },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(initial, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
         }
     }
 
@@ -740,21 +912,6 @@ fun PremiumHomeHeader() {
         )
 
         Spacer(modifier = Modifier.height(12.dp))
-
-        // --- Tagline ---
-        Text(
-            "Every rupee tracked. Every habit scored.",
-            color = TextSecondary.copy(alpha = 0.6f),
-            fontSize = 14.sp,
-            lineHeight = 20.sp
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            "Your financial story, told clearly.",
-            color = TextSecondary.copy(alpha = 0.8f),
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold
-        )
     }
 }
 
@@ -1039,8 +1196,8 @@ fun PremiumAiInsightsSection(
     errorMessage: String? = null,
     onGenerateClick: () -> Unit
 ) {
-    val geminiPurple = Color(0xFFA288E3)
-    val geminiBg = Color(0xFF2A2045)
+    val geminiPurple = Color(0xFF4231E7)
+    val geminiBg = Color(0xFF1A1640)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
@@ -1087,11 +1244,14 @@ fun PremiumAiInsightsSection(
                         }
                     }
                 } else if (errorMessage != null) {
+                    val errorLottie by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.ai_stars))
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(modifier = Modifier.size(64.dp).background(Color(0xFF3A1D27).copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
-                            Box(modifier = Modifier.size(48.dp).background(Color(0xFF3A1D27), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = ZorvynRed, modifier = Modifier.size(24.dp)) }
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
+                        LottieAnimation(
+                            composition = errorLottie,
+                            iterations = LottieConstants.IterateForever,
+                            modifier = Modifier.size(80.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text("Something went wrong", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(errorMessage, color = TextSecondary.copy(alpha = 0.7f), fontSize = 13.sp, textAlign = TextAlign.Center, lineHeight = 18.sp)
@@ -1099,11 +1259,14 @@ fun PremiumAiInsightsSection(
                         Text("Tap Refresh to try again", color = geminiPurple.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 } else if (insights.isEmpty()) {
+                    val emptyLottie by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.ai_stars))
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(modifier = Modifier.size(64.dp).background(geminiBg.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
-                            Box(modifier = Modifier.size(48.dp).background(geminiBg, CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = geminiPurple, modifier = Modifier.size(24.dp)) }
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
+                        LottieAnimation(
+                            composition = emptyLottie,
+                            iterations = LottieConstants.IterateForever,
+                            modifier = Modifier.size(80.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text("No insights yet", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
                         Text("Tap Refresh to let Gemini AI analyse your\nspending patterns", color = TextSecondary.copy(alpha = 0.6f), fontSize = 13.sp, textAlign = TextAlign.Center, lineHeight = 18.sp)
