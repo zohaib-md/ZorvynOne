@@ -30,6 +30,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
 import com.project.zorvynone.model.AppDatabase
@@ -240,79 +241,92 @@ fun AppNavigation(
         }
     }
 
-    NavHost(navController = navController, startDestination = startRoute) {
-        composable("login") {
-            LoginScreen(
-                authViewModel = authViewModel,
-                onLoginSuccess = { email ->
-                    // Sync AuthPrefs for widget + offline compat
-                    authPrefs.isLoggedIn = true
-                    authPrefs.email = email
-                    authPrefs.username = FirebaseAuth.getInstance().currentUser?.displayName ?: ""
+    // Track current route for bottom nav highlighting
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route ?: startRoute
+    val mainRoutes = setOf("home", "transactions", "insights", "score")
+    val showBottomBar = currentRoute in mainRoutes
 
-                    // Login to Kommunicate for Experia chatbot
-                    KommunicateHelper.loginUser(
-                        context = navController.context,
-                        displayName = FirebaseAuth.getInstance().currentUser?.displayName ?: "Expectr User"
-                    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(navController = navController, startDestination = startRoute) {
+            composable("login") {
+                LoginScreen(
+                    authViewModel = authViewModel,
+                    onLoginSuccess = { email ->
+                        authPrefs.isLoggedIn = true
+                        authPrefs.email = email
+                        authPrefs.username = FirebaseAuth.getInstance().currentUser?.displayName ?: ""
+                        KommunicateHelper.loginUser(
+                            context = navController.context,
+                            displayName = FirebaseAuth.getInstance().currentUser?.displayName ?: "Expectr User"
+                        )
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    },
+                    onNavigateToSignUp = { navController.navigate("signup") }
+                )
+            }
+            composable("signup") {
+                SignUpScreen(
+                    authViewModel = authViewModel,
+                    onRegisterSuccess = { username, email ->
+                        authPrefs.isLoggedIn = true
+                        authPrefs.username = username
+                        authPrefs.email = email
+                        KommunicateHelper.loginUser(
+                            context = navController.context,
+                            displayName = username
+                        )
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    },
+                    onNavigateToLogin = { navController.popBackStack() }
+                )
+            }
+            composable("home") {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                HomeScreen(
+                    viewModel = homeViewModel,
+                    onScoreClick = { navController.navigate("score") },
+                    onAddClick = { navTo("add_transaction") },
+                    onTxnsClick = { navTo("transactions") },
+                    onInsightsClick = { navTo("insights") },
+                    onScoreNavClick = { navTo("score") },
+                    onSignOut = {
+                        authViewModel.signOut()
+                        authPrefs.logout()
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onChatClick = {
+                        KommunicateHelper.openChat(context)
+                    },
+                    onSpendOrSkipClick = { navController.navigate("spend_or_skip") },
+                    onBillSplitClick = { navController.navigate("bill_split") }
+                )
+            }
+            composable("transactions") { TransactionsScreen(homeViewModel, onNavigateHome = { navTo("home") }, onNavigateAdd = { navTo("add_transaction") }) }
+            composable("insights") { InsightsScreen(homeViewModel, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }) }
+            composable("score") { ScoreScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }, onNavigateInsights = { navTo("insights") }) }
+            composable("add_transaction") { AddTransactionScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }) }
+            composable("spend_or_skip") { SpendOrSkipScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }) }
+            composable("bill_split") { BillSplitScreen(viewModel = homeViewModel, onNavigateBack = { navController.popBackStack() }) }
+        }
 
-                    navController.navigate("home") {
-                        popUpTo("login") { inclusive = true }
-                    }
-                },
-                onNavigateToSignUp = { navController.navigate("signup") }
+        // Floating bottom nav bar — overlaid on main screens
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showBottomBar,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(tween(350)) { it } + fadeIn(tween(300)),
+            exit = slideOutVertically(tween(250)) { it } + fadeOut(tween(200))
+        ) {
+            com.project.zorvynone.ui.components.ZorvynBottomNavBar(
+                currentRoute = currentRoute,
+                onNavigate = navTo
             )
         }
-        composable("signup") {
-            SignUpScreen(
-                authViewModel = authViewModel,
-                onRegisterSuccess = { username, email ->
-                    // Sync AuthPrefs for widget + offline compat
-                    authPrefs.isLoggedIn = true
-                    authPrefs.username = username
-                    authPrefs.email = email
-
-                    // Login to Kommunicate for Experia chatbot
-                    KommunicateHelper.loginUser(
-                        context = navController.context,
-                        displayName = username
-                    )
-
-                    navController.navigate("home") {
-                        popUpTo("login") { inclusive = true }
-                    }
-                },
-                onNavigateToLogin = { navController.popBackStack() }
-            )
-        }
-        composable("home") {
-            val context = androidx.compose.ui.platform.LocalContext.current
-            HomeScreen(
-                viewModel = homeViewModel,
-                onScoreClick = { navController.navigate("score") },
-                onAddClick = { navTo("add_transaction") },
-                onTxnsClick = { navTo("transactions") },
-                onInsightsClick = { navTo("insights") },
-                onScoreNavClick = { navTo("score") },
-                onSignOut = {
-                    authViewModel.signOut()
-                    authPrefs.logout()
-                    navController.navigate("login") {
-                        popUpTo(0) { inclusive = true }
-                    }
-                },
-                onChatClick = {
-                    KommunicateHelper.openChat(context)
-                },
-                onSpendOrSkipClick = { navController.navigate("spend_or_skip") },
-                onBillSplitClick = { navController.navigate("bill_split") }
-            )
-        }
-        composable("transactions") { TransactionsScreen(homeViewModel, onNavigateHome = { navTo("home") }, onNavigateAdd = { navTo("add_transaction") }) }
-        composable("insights") { InsightsScreen(homeViewModel, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }) }
-        composable("score") { ScoreScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }, onNavigateInsights = { navTo("insights") }) }
-        composable("add_transaction") { AddTransactionScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }) }
-        composable("spend_or_skip") { SpendOrSkipScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }) }
-        composable("bill_split") { BillSplitScreen(viewModel = homeViewModel, onNavigateBack = { navController.popBackStack() }) }
     }
 }

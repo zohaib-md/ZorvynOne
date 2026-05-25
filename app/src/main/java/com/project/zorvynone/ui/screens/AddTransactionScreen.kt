@@ -383,7 +383,6 @@ fun AddTransactionScreen(
             OutlinedTextField(
                 value = note, onValueChange = { note = it },
                 placeholder = { Text("Add a note (optional)...", color = TextSecondary.copy(alpha = 0.5f)) },
-                @Suppress("DEPRECATION")
                 leadingIcon = { Icon(Icons.Default.Notes, contentDescription = null, tint = TextSecondary) },
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedContainerColor = ZorvynSurface, focusedContainerColor = ZorvynSurface,
