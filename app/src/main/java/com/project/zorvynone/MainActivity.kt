@@ -313,6 +313,6 @@ fun AppNavigation(
         composable("score") { ScoreScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }, onNavigateInsights = { navTo("insights") }) }
         composable("add_transaction") { AddTransactionScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }) }
         composable("spend_or_skip") { SpendOrSkipScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }) }
-        composable("bill_split") { BillSplitScreen(onNavigateBack = { navController.popBackStack() }) }
+        composable("bill_split") { BillSplitScreen(viewModel = homeViewModel, onNavigateBack = { navController.popBackStack() }) }
     }
 }

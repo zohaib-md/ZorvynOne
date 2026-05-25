@@ -576,7 +576,118 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
         }
     }
 
-    // --- UTILITIES ---
+    // ═══════════════════════════════════════════════════════════════════
+    // ── AI SPENDING ROAST 🔥 ──────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+
+    private val _roastText = MutableStateFlow<List<String>>(emptyList())
+    val roastText = _roastText.asStateFlow()
+
+    private val _isRoastLoading = MutableStateFlow(false)
+    val isRoastLoading = _isRoastLoading.asStateFlow()
+
+    private val _roastError = MutableStateFlow<String?>(null)
+    val roastError = _roastError.asStateFlow()
+
+    fun generateRoast() {
+        viewModelScope.launch {
+            _isRoastLoading.value = true
+            _roastError.value = null
+            try {
+                val txns = transactions.value.filter { !it.isIncome }
+                if (txns.isEmpty()) {
+                    _roastError.value = "No expenses to roast yet! Go spend something."
+                    return@launch
+                }
+
+                val categoryBreakdown = txns
+                    .groupBy { it.category }
+                    .mapValues { entry -> entry.value.sumOf { it.amount } }
+                    .entries.sortedByDescending { it.value }
+                    .joinToString(", ") { "${it.key}: ₹${it.value}" }
+
+                val totalSpent = txns.sumOf { it.amount }
+
+                val prompt = """
+                    You are a brutally honest comedian analyzing someone's spending.
+                    Their data:
+                    Total spent: ₹$totalSpent
+                    Category breakdown: $categoryBreakdown
+                    Number of transactions: ${txns.size}
+
+                    Rules:
+                    - Be funny, savage, and specific (mention actual categories + amounts)
+                    - Give exactly 4 short roast lines, each under 20 words
+                    - Use Indian context (Zomato, chai, auto rickshaw, UPI, etc.)
+                    - End with one backhanded compliment
+                    - Return ONLY 4 lines starting with 🔥. No headers or extra text.
+                """.trimIndent()
+
+                val res = callGeminiApi(prompt, GEMINI_API_KEY)
+                val parsed = res.lines()
+                    .map { it.trim() }
+                    .filter { it.length > 5 }
+                    .take(4)
+
+                if (parsed.isNotEmpty()) {
+                    _roastText.value = parsed
+                } else {
+                    _roastError.value = "Gemini couldn't think of a good roast. Try again."
+                }
+            } catch (e: Exception) {
+                Log.e("ZorvynAI", "generateRoast failed", e)
+                _roastError.value = "Failed: ${e.message?.take(60)}"
+            } finally {
+                _isRoastLoading.value = false
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ── AI SMART SPLIT 🧠 ─────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+
+    private val _smartSplitResult = MutableStateFlow<String?>(null)
+    val smartSplitResult = _smartSplitResult.asStateFlow()
+
+    private val _isSmartSplitLoading = MutableStateFlow(false)
+    val isSmartSplitLoading = _isSmartSplitLoading.asStateFlow()
+
+    fun parseSmartSplit(description: String) {
+        viewModelScope.launch {
+            _isSmartSplitLoading.value = true
+            _smartSplitResult.value = null
+            try {
+                val prompt = """
+                    Parse this bill description into a split.
+                    Input: $description
+
+                    Return ONLY valid JSON:
+                    {"people": [{"name": "Rahul", "amount": 410}, {"name": "Priya", "amount": 280}]}
+
+                    Rules:
+                    - Sum up each person's items
+                    - "I" or "me" or "my" = "You"
+                    - Return ONLY JSON, absolutely nothing else
+                """.trimIndent()
+
+                val res = callGeminiApi(prompt, GEMINI_API_KEY)
+                val jsonStr = res.substring(res.indexOf('{'), res.lastIndexOf('}') + 1)
+                // Validate it's parseable
+                JSONObject(jsonStr)
+                _smartSplitResult.value = jsonStr
+            } catch (e: Exception) {
+                Log.e("ZorvynAI", "parseSmartSplit failed", e)
+                _smartSplitResult.value = null
+            } finally {
+                _isSmartSplitLoading.value = false
+            }
+        }
+    }
+
+    fun clearSmartSplitResult() {
+        _smartSplitResult.value = null
+    }
     private suspend fun callGeminiApi(prompt: String, apiKey: String): String = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
             throw Exception("Gemini API key is missing. Add GEMINI_API_KEY to local.properties and rebuild.")

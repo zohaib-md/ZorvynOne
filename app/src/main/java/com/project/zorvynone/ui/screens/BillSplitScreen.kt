@@ -32,7 +32,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.project.zorvynone.ui.theme.*
+import com.project.zorvynone.viewmodel.HomeViewModel
+import org.json.JSONObject
 import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -44,8 +47,10 @@ data class SplitPerson(
     val percentage: String = ""
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BillSplitScreen(
+    viewModel: HomeViewModel,
     onNavigateBack: () -> Unit
 ) {
     val premiumGold = Color(0xFFE5C158)
@@ -65,6 +70,41 @@ fun BillSplitScreen(
         )
     }
     var nextId by remember { mutableIntStateOf(3) }
+
+    // AI Smart Split
+    var showSmartSplitSheet by remember { mutableStateOf(false) }
+    var smartSplitInput by remember { mutableStateOf("") }
+
+    // Share card
+    var showShareSheet by remember { mutableStateOf(false) }
+    var upiId by remember { mutableStateOf("") }
+    val isSmartSplitLoading by viewModel.isSmartSplitLoading.collectAsStateWithLifecycle()
+    val smartSplitResult by viewModel.smartSplitResult.collectAsStateWithLifecycle()
+
+    // Process AI result
+    LaunchedEffect(smartSplitResult) {
+        smartSplitResult?.let { jsonStr ->
+            try {
+                val json = JSONObject(jsonStr)
+                val arr = json.getJSONArray("people")
+                val newPeople = mutableListOf<SplitPerson>()
+                var totalAmount = 0.0
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    val amt = obj.getDouble("amount")
+                    totalAmount += amt
+                    newPeople.add(SplitPerson(i + 1, obj.getString("name"), customAmount = amt.toInt().toString()))
+                }
+                people = newPeople
+                nextId = newPeople.size + 1
+                splitMode = "custom"
+                billAmount = totalAmount.toInt().toString()
+                showSmartSplitSheet = false
+                smartSplitInput = ""
+                viewModel.clearSmartSplitResult()
+            } catch (_: Exception) {}
+        }
+    }
 
     val bill = billAmount.toDoubleOrNull() ?: 0.0
     val tip = tipPercent.toDoubleOrNull() ?: 0.0
@@ -261,6 +301,20 @@ fun BillSplitScreen(
             }
 
             Spacer(modifier = Modifier.height(28.dp))
+
+            // ── AI SMART SPLIT BUTTON ──
+            Button(
+                onClick = { showSmartSplitSheet = true },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4231E7))
+            ) {
+                Icon(Icons.Default.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("AI Smart Split ✨", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             // ── SPLIT MODE ──
             Text("SPLIT MODE", color = TextSecondary.copy(0.5f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
@@ -538,32 +592,44 @@ fun BillSplitScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // ── UPI ID INPUT ──
+            if (bill > 0) {
+                Text("UPI ID (for QR on share card)", color = TextSecondary.copy(0.4f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = upiId,
+                    onValueChange = { upiId = it },
+                    placeholder = { Text("yourname@upi", color = TextSecondary.copy(0.2f)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = LocalTextStyle.current.copy(color = TextPrimary, fontSize = 14.sp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = indigo.copy(0.4f),
+                        unfocusedBorderColor = TextSecondary.copy(0.1f),
+                        cursorColor = indigo
+                    ),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
             // ── ACTION BUTTONS ──
             if (bill > 0) {
-                // Share button
+                // Premium share card
                 Button(
-                    onClick = {
-                        val shareText = buildShareText(bill, tipAmount, totalWithTip, people, perPersonAmounts, fmt)
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareText)
-                        }
-                        context.startActivity(Intent.createChooser(intent, "Share bill split"))
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
+                    onClick = { showShareSheet = true },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = indigo)
                 ) {
                     Icon(Icons.Default.Share, null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Share Split", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("Share Premium Split Card", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Copy button
+                // Copy text
                 OutlinedButton(
                     onClick = {
                         val shareText = buildShareText(bill, tipAmount, totalWithTip, people, perPersonAmounts, fmt)
@@ -571,19 +637,142 @@ fun BillSplitScreen(
                         clipboard.setPrimaryClip(ClipData.newPlainText("Bill Split", shareText))
                         Toast.makeText(context, "Copied to clipboard!", Toast.LENGTH_SHORT).show()
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = RoundedCornerShape(16.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, TextSecondary.copy(0.15f))
                 ) {
                     Icon(Icons.Default.ContentCopy, null, tint = TextSecondary.copy(0.7f), modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Copy to Clipboard", color = TextSecondary.copy(0.7f), fontSize = 13.sp)
+                    Text("Copy as Text", color = TextSecondary.copy(0.7f), fontSize = 13.sp)
                 }
             }
 
             Spacer(modifier = Modifier.height(40.dp))
+        }
+    }
+
+    // ── AI Smart Split Bottom Sheet ──
+    if (showSmartSplitSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSmartSplitSheet = false },
+            containerColor = ZorvynSurface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp).fillMaxWidth()) {
+                Text("AI Smart Split ✨", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text("Describe what everyone ordered in plain English", color = TextSecondary.copy(0.6f), fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(20.dp))
+
+                OutlinedTextField(
+                    value = smartSplitInput,
+                    onValueChange = { smartSplitInput = it },
+                    placeholder = { Text("e.g. Rahul had pizza ₹350, Priya had pasta ₹280, I had coffee ₹150", color = TextSecondary.copy(0.3f)) },
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF4231E7),
+                        unfocusedBorderColor = TextSecondary.copy(0.15f),
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        cursorColor = Color(0xFF4231E7)
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = { if (smartSplitInput.isNotBlank()) viewModel.parseSmartSplit(smartSplitInput) },
+                    enabled = smartSplitInput.isNotBlank() && !isSmartSplitLoading,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4231E7))
+                ) {
+                    if (isSmartSplitLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("Gemini is thinking...", color = Color.White, fontSize = 14.sp)
+                    } else {
+                        Text("Split with AI →", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
+
+    // ── PREMIUM SHARE CARD BOTTOM SHEET ──
+    if (showShareSheet && bill > 0) {
+        ModalBottomSheet(
+            onDismissRequest = { showShareSheet = false },
+            containerColor = ZorvynSurface,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 32.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("PREVIEW", color = TextSecondary.copy(0.4f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // The premium card
+                SplitReceiptCard(
+                    bill = bill,
+                    tipAmount = tipAmount,
+                    totalWithTip = totalWithTip,
+                    people = people,
+                    perPersonAmounts = perPersonAmounts,
+                    upiId = upiId
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Share as image
+                Button(
+                    onClick = {
+                        val bitmap = renderSplitCardBitmap(
+                            bill = bill,
+                            tipAmount = tipAmount,
+                            totalWithTip = totalWithTip,
+                            people = people,
+                            perPersonAmounts = perPersonAmounts,
+                            upiId = upiId
+                        )
+                        shareCardAsImage(context, bitmap)
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = indigo)
+                ) {
+                    Icon(Icons.Default.Share, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Share as Image", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Share as text fallback
+                OutlinedButton(
+                    onClick = {
+                        val shareText = buildShareText(bill, tipAmount, totalWithTip, people, perPersonAmounts, fmt)
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, shareText)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Share split"))
+                    },
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, TextSecondary.copy(0.15f))
+                ) {
+                    Text("Share as Text", color = TextSecondary.copy(0.7f), fontSize = 13.sp)
+                }
+            }
         }
     }
 }

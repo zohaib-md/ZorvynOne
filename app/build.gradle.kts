@@ -88,6 +88,8 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.7")
     //lottie
     implementation("com.airbnb.android:lottie-compose:6.7.1")
+    //qr code
+    implementation("com.google.zxing:core:3.5.2")
     //widget
     // Jetpack Glance for Home Screen Widgets
     implementation("androidx.glance:glance-appwidget:1.1.0")

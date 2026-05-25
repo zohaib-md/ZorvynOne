@@ -108,6 +108,7 @@ fun premiumShimmerBrush(): Brush {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
@@ -133,6 +134,12 @@ fun HomeScreen(
 
     val isVoiceLoading by viewModel.isVoiceLoading.collectAsStateWithLifecycle()
     val isScannerLoading by viewModel.isScannerLoading.collectAsStateWithLifecycle()
+
+    val roastLines by viewModel.roastText.collectAsStateWithLifecycle()
+    val isRoastLoading by viewModel.isRoastLoading.collectAsStateWithLifecycle()
+    val roastError by viewModel.roastError.collectAsStateWithLifecycle()
+
+    var showRoastSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -233,14 +240,15 @@ fun HomeScreen(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                // --- OPTION 2: Ask Experia (top) ---
+
+                // --- OPTION: Ask Experia ---
                 Row(
                     modifier = Modifier
                         .graphicsLayer(
-                            alpha = option2Alpha,
-                            translationY = option2Offset
+                            alpha = option1Alpha,
+                            translationY = option1Offset
                         )
-                        .padding(bottom = 12.dp),
+                        .padding(bottom = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.End
                 ) {
@@ -276,60 +284,6 @@ fun HomeScreen(
                         elevation = FloatingActionButtonDefaults.elevation(6.dp, 10.dp)
                     ) {
                         Icon(Icons.Default.SmartToy, contentDescription = "Ask Experia", modifier = Modifier.size(20.dp))
-                    }
-                }
-
-                // --- OPTION 1: Voice AI (closer to main FAB) ---
-                Row(
-                    modifier = Modifier
-                        .graphicsLayer(
-                            alpha = option1Alpha,
-                            translationY = option1Offset
-                        )
-                        .padding(bottom = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    if (isFabExpanded) {
-                        Box(
-                            modifier = Modifier
-                                .shadow(6.dp, RoundedCornerShape(8.dp))
-                                .background(fabSurface, RoundedCornerShape(8.dp))
-                                .border(0.5.dp, fabGold.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                if (isVoiceLoading) "Processing..." else "Voice AI",
-                                color = fabGold,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                    }
-                    FloatingActionButton(
-                        onClick = {
-                            isFabExpanded = false
-                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Say a transaction")
-                            }
-                            speechLauncher.launch(intent)
-                        },
-                        containerColor = fabDark,
-                        contentColor = fabGold,
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .border(1.dp, fabGold.copy(alpha = 0.4f), CircleShape),
-                        elevation = FloatingActionButtonDefaults.elevation(6.dp, 10.dp)
-                    ) {
-                        if (isVoiceLoading) {
-                            CircularProgressIndicator(color = fabGold, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Mic, contentDescription = "Voice AI", modifier = Modifier.size(20.dp))
-                        }
                     }
                 }
 
@@ -424,15 +378,13 @@ fun HomeScreen(
             )
             Spacer(modifier = Modifier.height(32.dp))
 
-            PremiumScannerCard(
-                isLoading = isScannerLoading,
-                onClick = {
-                    photoPickerLauncher.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
-                }
-            )
-            Spacer(modifier = Modifier.height(24.dp))
+            // ── AI SPENDING ROAST ── compact pill trigger
+            RoastTriggerPill(onClick = {
+                showRoastSheet = true
+                if (roastLines.isEmpty() && !isRoastLoading) viewModel.generateRoast()
+            })
 
-            // --- Quick Actions ---
+            Spacer(modifier = Modifier.height(24.dp))            // --- Quick Actions ---
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -461,6 +413,177 @@ fun HomeScreen(
 
             RecentTransactionsSection(transactions = transactions, onDelete = { txn -> viewModel.deleteTransaction(txn) })
             Spacer(modifier = Modifier.height(80.dp))
+        }
+    }
+
+    // ── ROAST BOTTOM SHEET ──
+    if (showRoastSheet) {
+        val fireRed = Color(0xFFEF4444)
+        val fireOrange = Color(0xFFF97316)
+        val fireYellow = Color(0xFFFBBF24)
+        val burnCardBg = Color(0xFF261510)
+        val fireLottie by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.fire))
+        val lmaoLottie by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.lmao))
+
+        val infiniteTransition = rememberInfiniteTransition(label = "roast_fx")
+        val glowAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.1f, targetValue = 0.35f,
+            animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "glow"
+        )
+
+        ModalBottomSheet(
+            onDismissRequest = { showRoastSheet = false },
+            containerColor = Color(0xFF1C0C06),
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .width(40.dp)
+                        .height(4.dp)
+                        .background(fireOrange.copy(0.4f), RoundedCornerShape(2.dp))
+                )
+            }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Hero fire
+                LottieAnimation(
+                    composition = fireLottie,
+                    iterations = LottieConstants.IterateForever,
+                    modifier = Modifier.size(90.dp)
+                )
+
+                // Title
+                Text(
+                    text = "ROAST MY SPENDING",
+                    style = LocalTextStyle.current.copy(
+                        brush = Brush.horizontalGradient(listOf(fireYellow, fireOrange, fireRed)),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 2.sp
+                    )
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Gemini AI roasts your spending habits",
+                    color = Color(0xFFB07A50),
+                    fontSize = 12.sp
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                if (isRoastLoading) {
+                    // Loading state
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .background(burnCardBg, RoundedCornerShape(20.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            LottieAnimation(composition = fireLottie, iterations = LottieConstants.IterateForever, modifier = Modifier.size(48.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Cooking your roast...", color = fireOrange, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else if (roastLines.isNotEmpty()) {
+                    // Burn cards
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        roastLines.forEach { line ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(burnCardBg, RoundedCornerShape(16.dp))
+                                    .border(1.dp, fireOrange.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(4.dp)
+                                        .height(60.dp)
+                                        .background(
+                                            Brush.verticalGradient(listOf(fireYellow, fireOrange, fireRed)),
+                                            RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                                        )
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                LottieAnimation(
+                                    composition = lmaoLottie,
+                                    iterations = LottieConstants.IterateForever,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    line,
+                                    color = Color.White.copy(0.9f),
+                                    fontSize = 13.5.sp,
+                                    lineHeight = 19.sp,
+                                    modifier = Modifier.weight(1f).padding(vertical = 14.dp, horizontal = 4.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(22.dp))
+
+                    // Action buttons
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f).height(50.dp)
+                                .background(burnCardBg, RoundedCornerShape(16.dp))
+                                .border(1.dp, fireOrange.copy(0.25f), RoundedCornerShape(16.dp))
+                                .clickable { viewModel.generateRoast() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                LottieAnimation(composition = fireLottie, iterations = LottieConstants.IterateForever, modifier = Modifier.size(22.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Roast Again", color = fireOrange, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f).height(50.dp)
+                                .background(Brush.horizontalGradient(listOf(fireRed, fireOrange, fireYellow)), RoundedCornerShape(16.dp))
+                                .clickable {
+                                    val text = "\uD83D\uDD25 My Spending Roast\n\n" + roastLines.joinToString("\n") + "\n\nRoasted by ZorvynOne AI \uD83D\uDE80"
+                                    val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) }
+                                    context.startActivity(Intent.createChooser(intent, "Share Roast"))
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Share, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Share", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                    }
+                } else if (roastError != null) {
+                    Text(roastError ?: "", color = fireOrange.copy(0.7f), fontSize = 13.sp, textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(50.dp)
+                            .background(Brush.horizontalGradient(listOf(fireRed, fireOrange)), RoundedCornerShape(16.dp))
+                            .clickable { viewModel.generateRoast() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Try Again", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                    }
+                }
+            }
         }
     }
 }
@@ -515,6 +638,73 @@ fun QuickActionCard(
                 Icons.AutoMirrored.Filled.ArrowForward,
                 null,
                 tint = Color.White.copy(0.5f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun RoastTriggerPill(onClick: () -> Unit) {
+    val fireLottie by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.fire))
+    val infiniteTransition = rememberInfiniteTransition(label = "pill_glow")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.15f, targetValue = 0.45f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "pill_pulse"
+    )
+
+    val fireRed = Color(0xFFEF4444)
+    val fireOrange = Color(0xFFF97316)
+    val fireYellow = Color(0xFFFBBF24)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .background(
+                Brush.horizontalGradient(
+                    listOf(fireRed.copy(alpha = 0.15f), fireOrange.copy(alpha = 0.08f), Color.Transparent)
+                ),
+                RoundedCornerShape(18.dp)
+            )
+            .border(
+                1.dp,
+                Brush.horizontalGradient(
+                    listOf(fireOrange.copy(glowAlpha), fireYellow.copy(glowAlpha * 0.5f), Color.Transparent)
+                ),
+                RoundedCornerShape(18.dp)
+            )
+            .clickable { onClick() },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            LottieAnimation(
+                composition = fireLottie,
+                iterations = LottieConstants.IterateForever,
+                modifier = Modifier.size(36.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Roast My Spending",
+                    color = fireOrange,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    "Let AI roast your habits",
+                    color = Color(0xFFB07A50),
+                    fontSize = 11.sp
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                null,
+                tint = fireOrange.copy(0.6f),
                 modifier = Modifier.size(18.dp)
             )
         }
