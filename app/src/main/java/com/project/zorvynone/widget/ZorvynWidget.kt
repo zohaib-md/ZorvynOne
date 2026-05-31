@@ -21,6 +21,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import com.google.firebase.auth.FirebaseAuth
 import com.project.zorvynone.MainActivity
 import com.project.zorvynone.R
 import com.project.zorvynone.model.AppDatabase
@@ -31,17 +32,24 @@ import java.util.Locale
 class ZorvynWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val db = AppDatabase.getDatabase(context)
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        val formatter = NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply {
+            maximumFractionDigits = 0
+        }
+
+        if (uid == null) {
+            // No user logged in — show zero balance
+            provideContent { WidgetUI(balance = formatter.format(0)) }
+            return
+        }
+
+        val db = AppDatabase.getDatabase(context, uid)
         val dao = db.transactionDao()
 
         // 1. Fetch Real Data
         val totalIncome = dao.getTotalIncome().first() ?: 0
         val totalExpense = dao.getTotalExpenses().first() ?: 0
         val balance = totalIncome - totalExpense
-
-        val formatter = NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply {
-            maximumFractionDigits = 0
-        }
 
         provideContent {
             WidgetUI(balance = formatter.format(balance))

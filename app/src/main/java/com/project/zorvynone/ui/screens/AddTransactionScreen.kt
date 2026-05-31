@@ -22,6 +22,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -244,46 +247,83 @@ fun AddTransactionScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             // Income / Expense Toggle
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                FilterChip(
-                    selected = !isIncome,
-                    onClick = { isIncome = false },
-                    label = { Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        Icon(Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(16.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Expense button
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .drawBehind {
+                            if (size.width > 0f && size.height > 0f) {
+                                if (!isIncome) {
+                                    drawRect(Brush.linearGradient(
+                                        listOf(Color(0xFF7F1D1D), Color(0xFFEF4444), Color(0xFFFF6B6B)),
+                                        Offset.Zero, Offset(size.width, size.height)
+                                    ))
+                                } else {
+                                    drawRect(androidx.compose.ui.graphics.SolidColor(ZorvynSurface))
+                                }
+                            }
+                        }
+                        .clickable { isIncome = false },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.ArrowDownward,
+                            contentDescription = null,
+                            tint = if (!isIncome) Color.White else TextSecondary.copy(0.5f),
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(Modifier.width(8.dp))
-                        Text("Expense")
-                    }},
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = ZorvynRed.copy(alpha = 0.15f),
-                        selectedLabelColor = ZorvynRed,
-                        selectedLeadingIconColor = ZorvynRed,
-                        containerColor = ZorvynSurface,
-                        labelColor = TextSecondary
-                    ),
-                    modifier = Modifier.weight(1f).height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    border = null
-                )
-                FilterChip(
-                    selected = isIncome,
-                    onClick = { isIncome = true },
-                    label = { Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        Icon(Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text(
+                            "Expense",
+                            color = if (!isIncome) Color.White else TextSecondary.copy(0.5f),
+                            fontWeight = if (!isIncome) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 15.sp
+                        )
+                    }
+                }
+                // Income button
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .drawBehind {
+                            if (size.width > 0f && size.height > 0f) {
+                                if (isIncome) {
+                                    drawRect(Brush.linearGradient(
+                                        listOf(Color(0xFF14532D), Color(0xFF22C55E), Color(0xFF4ADE80)),
+                                        Offset.Zero, Offset(size.width, size.height)
+                                    ))
+                                } else {
+                                    drawRect(androidx.compose.ui.graphics.SolidColor(ZorvynSurface))
+                                }
+                            }
+                        }
+                        .clickable { isIncome = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.ArrowUpward,
+                            contentDescription = null,
+                            tint = if (isIncome) Color.White else TextSecondary.copy(0.5f),
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(Modifier.width(8.dp))
-                        Text("Income")
-                    }},
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = ZorvynGreen.copy(alpha = 0.15f),
-                        selectedLabelColor = ZorvynGreen,
-                        selectedLeadingIconColor = ZorvynGreen,
-                        containerColor = ZorvynSurface,
-                        labelColor = TextSecondary
-                    ),
-                    modifier = Modifier.weight(1f).height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    border = null
-                )
+                        Text(
+                            "Income",
+                            color = if (isIncome) Color.White else TextSecondary.copy(0.5f),
+                            fontWeight = if (isIncome) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 15.sp
+                        )
+                    }
+                }
             }
+
 
             Spacer(modifier = Modifier.height(24.dp))
 

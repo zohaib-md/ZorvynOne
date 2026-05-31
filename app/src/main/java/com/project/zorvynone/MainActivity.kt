@@ -9,6 +9,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -36,6 +37,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.project.zorvynone.model.AppDatabase
 import com.project.zorvynone.model.AuthPrefs
 import com.project.zorvynone.ui.screens.*
+import com.project.zorvynone.ui.theme.PlayfairDisplay
+import com.project.zorvynone.ui.theme.TextPrimary
 import com.project.zorvynone.ui.theme.ZorvynBackground
 import com.project.zorvynone.ui.theme.ZorvynOneTheme
 import com.project.zorvynone.viewmodel.AuthViewModel
@@ -75,23 +78,48 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        val db = AppDatabase.getDatabase(applicationContext)
-        val factory = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                @Suppress("UNCHECKED_CAST")
-                return HomeViewModel(db.transactionDao()) as T
-            }
-        }
-
         setContent {
             ZorvynOneTheme {
                 var showMainContent by remember { mutableStateOf(false) }
+
+                // ── Reactive UID: updates whenever Firebase auth state changes ──────
+                // This is the KEY fix — uid is a real State so recomposition is
+                // triggered when a different user logs in, forcing a new DB + ViewModel.
+                var uid by remember {
+                    mutableStateOf(FirebaseAuth.getInstance().currentUser?.uid ?: "guest")
+                }
+
+                DisposableEffect(Unit) {
+                    val listener = FirebaseAuth.AuthStateListener { auth ->
+                        val newUid = auth.currentUser?.uid ?: "guest"
+                        if (newUid != uid) {
+                            AppDatabase.clearInstance() // close old user's DB connection
+                            uid = newUid               // triggers full recomposition
+                        }
+                    }
+                    FirebaseAuth.getInstance().addAuthStateListener(listener)
+                    onDispose { FirebaseAuth.getInstance().removeAuthStateListener(listener) }
+                }
+
+                // remember(uid) → recreated whenever user switches
+                val db = remember(uid) {
+                    AppDatabase.getDatabase(applicationContext, uid)
+                }
+                val factory = remember(uid) {
+                    object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            @Suppress("UNCHECKED_CAST")
+                            return HomeViewModel(db.transactionDao()) as T
+                        }
+                    }
+                }
 
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = ZorvynBackground
                 ) {
-                    val homeViewModel: HomeViewModel = viewModel(factory = factory)
+                    // viewModel(key = uid) → new ViewModel instance per user
+                    val homeViewModel: HomeViewModel = viewModel(key = uid, factory = factory)
                     val authViewModel: AuthViewModel = viewModel()
 
                     if (showMainContent) {
@@ -165,7 +193,7 @@ fun ExpectrAnimatedSplash(onAnimFinished: () -> Unit) {
 
     Box(
         modifier = Modifier.fillMaxSize()
-            .background(Brush.radialGradient(colors = listOf(Color(0xFF1C2238), Color(0xFF07090F)), radius = 2000f)),
+            .background(Brush.radialGradient(colors = listOf(Color(0xFF0A0A0A), Color(0xFF000000)), radius = 2000f)),
         contentAlignment = Alignment.Center
     ) {
         // LAYER 1: Background Glow
@@ -211,14 +239,49 @@ fun ExpectrAnimatedSplash(onAnimFinished: () -> Unit) {
         // LAYER 7: Branding
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.scale(scale).graphicsLayer(alpha = alpha)) {
             Box {
-                Text("expectr", color = Color.White.copy(0.1f), fontSize = 54.sp, fontWeight = FontWeight.ExtraLight, letterSpacing = (-2).sp)
-                Text("expectr", fontSize = 54.sp, fontWeight = FontWeight.ExtraLight, letterSpacing = (-2).sp,
-                    style = androidx.compose.ui.text.TextStyle(brush = Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(0.8f), Color.Transparent),
-                        start = Offset(shimmerOffset - 200f, shimmerOffset - 200f), end = Offset(shimmerOffset, shimmerOffset))))
+                // Glow shadow layer — deep gold blur effect
+                Text(
+                    "expectr",
+                    color = Color(0xFFE5C158).copy(0.18f),
+                    fontSize = 72.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = PlayfairDisplay,
+                    letterSpacing = (-3).sp
+                )
+                // Base white layer
+                Text(
+                    "expectr",
+                    color = Color.White.copy(0.92f),
+                    fontSize = 72.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = PlayfairDisplay,
+                    letterSpacing = (-3).sp
+                )
+                // Animated gold shimmer sweep on top
+                Text(
+                    "expectr",
+                    fontSize = 72.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = PlayfairDisplay,
+                    letterSpacing = (-3).sp,
+                    style = androidx.compose.ui.text.TextStyle(
+                        brush = Brush.linearGradient(
+                            listOf(
+                                Color.Transparent,
+                                Color(0xFFE5C158).copy(0.5f),
+                                Color.White,
+                                Color(0xFFE5C158).copy(0.5f),
+                                Color.Transparent
+                            ),
+                            start = Offset(shimmerOffset - 300f, 0f),
+                            end = Offset(shimmerOffset, 0f)
+                        )
+                    )
+                )
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             AnimatedVisibility(visible = startAnimation, enter = fadeIn(tween(1000, 500)) + expandVertically(tween(1000, 500))) {
-                Text("FINANCIAL INTELLIGENCE", color = Color(0xFFE5C158).copy(0.7f), fontSize = 11.sp, letterSpacing = 5.sp, fontWeight = FontWeight.Bold)
+                Text("FINANCIAL INTELLIGENCE", color = Color(0xFFE5C158).copy(0.85f), fontSize = 11.sp, letterSpacing = 6.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -244,8 +307,23 @@ fun AppNavigation(
     // Track current route for bottom nav highlighting
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: startRoute
-    val mainRoutes = setOf("home", "transactions", "insights", "score")
+    val mainRoutes = setOf("home", "transactions", "insights", "savings")
     val showBottomBar = currentRoute in mainRoutes
+
+    // ── Global round-up snackbar ──
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    LaunchedEffect(Unit) {
+        homeViewModel.roundUpEvent.collect { event ->
+            val result = snackbarHostState.showSnackbar(
+                message = "₹${event.expenseAmount} on ${event.category} → ₹${event.amount} to ${event.vaultName}?",
+                actionLabel = "Deposit",
+                duration = androidx.compose.material3.SnackbarDuration.Long
+            )
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                homeViewModel.confirmRoundUp(event.vaultId, event.amount)
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(navController = navController, startDestination = startRoute) {
@@ -312,6 +390,7 @@ fun AppNavigation(
             composable("insights") { InsightsScreen(homeViewModel, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }) }
             composable("score") { ScoreScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }, onNavigateHome = { navTo("home") }, onNavigateTxns = { navTo("transactions") }, onNavigateAdd = { navTo("add_transaction") }, onNavigateInsights = { navTo("insights") }) }
             composable("add_transaction") { AddTransactionScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }) }
+            composable("savings") { SavingsScreen(viewModel = homeViewModel) }
             composable("spend_or_skip") { SpendOrSkipScreen(homeViewModel, onNavigateBack = { navController.popBackStack() }) }
             composable("bill_split") { BillSplitScreen(viewModel = homeViewModel, onNavigateBack = { navController.popBackStack() }) }
         }
@@ -326,6 +405,22 @@ fun AppNavigation(
             com.project.zorvynone.ui.components.ZorvynBottomNavBar(
                 currentRoute = currentRoute,
                 onNavigate = navTo
+            )
+        }
+
+        // Global round-up snackbar host
+        androidx.compose.material3.SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = if (showBottomBar) 80.dp else 16.dp)
+        ) { data ->
+            androidx.compose.material3.Snackbar(
+                snackbarData = data,
+                containerColor = Color(0xFF1E1E1E),
+                contentColor = Color(0xFFF0F0F0),
+                actionColor = Color(0xFFE5C158),
+                shape = RoundedCornerShape(14.dp)
             )
         }
     }

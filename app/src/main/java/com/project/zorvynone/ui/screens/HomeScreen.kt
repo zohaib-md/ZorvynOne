@@ -43,6 +43,8 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
@@ -1091,8 +1093,8 @@ fun PremiumHomeHeader() {
         // --- Hero headline — Playfair Display Bold ---
         Text(
             text = buildAnnotatedString {
-                withStyle(SpanStyle(color = TextPrimary)) { append("Your money,\n") }
-                withStyle(SpanStyle(color = premiumGold)) { append("fully in focus.") }
+                withStyle(SpanStyle(color = TextPrimary)) { append("Your wealth,\n") }
+                withStyle(SpanStyle(color = premiumGold)) { append("always awake.") }
             },
             fontSize = 36.sp,
             fontWeight = FontWeight.Bold,
@@ -1341,12 +1343,16 @@ fun PremiumCredScoreCard(score: Int, onClick: () -> Unit = {}) {
         else -> "High Risk Profile"
     }
 
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = ZorvynSurface),
-        border = BorderStroke(1.dp, statusColor.copy(alpha = 0.15f))
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .drawBehind {
+                if (size.width > 0f && size.height > 0f) drawRect(
+                    Brush.linearGradient(listOf(Color(0xFF2A1507), Color(0xFF78350F).copy(0.5f)), Offset.Zero, Offset(size.width, size.height))
+                )
+            }
+            .clickable { onClick() }
     ) {
         Row(modifier = Modifier.padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(70.dp)) {
@@ -1355,26 +1361,29 @@ fun PremiumCredScoreCard(score: Int, onClick: () -> Unit = {}) {
                     progress = { animatedProgress },
                     modifier = Modifier.fillMaxSize(),
                     color = premiumGold,
-                    trackColor = TextSecondary.copy(alpha = 0.1f),
+                    trackColor = premiumGold.copy(alpha = 0.1f),
                     strokeWidth = 5.dp,
                     strokeCap = StrokeCap.Round
                 )
-                Text("$score", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                Text("$score", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
             }
             Spacer(modifier = Modifier.width(20.dp))
             Column(modifier = Modifier.weight(1f)) {
-                // UPDATED NAME
-                Text("EXPECTR SCORE", color = TextSecondary.copy(alpha = 0.7f), fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("⚡", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("EXPECTR SCORE", color = Color(0xFFFBBF24).copy(alpha = 0.7f), fontSize = 10.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text("$score", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-                    Text(" / 100", color = TextSecondary.copy(alpha = 0.5f), fontSize = 14.sp, modifier = Modifier.padding(bottom = 3.dp))
+                    Text("$score", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(" / 100", color = Color(0xFFFBBF24).copy(alpha = 0.4f), fontSize = 14.sp, modifier = Modifier.padding(bottom = 3.dp))
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(statusText, color = statusColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text(rankMock, color = TextSecondary.copy(alpha = 0.5f), fontSize = 12.sp)
+                Text(rankMock, color = Color(0xFFFBBF24).copy(alpha = 0.4f), fontSize = 12.sp)
             }
-            Icon(Icons.Default.ChevronRight, contentDescription = "View Details", tint = TextSecondary.copy(alpha = 0.5f))
+            Icon(Icons.Default.ChevronRight, contentDescription = "View Details", tint = Color(0xFFFBBF24).copy(alpha = 0.4f))
         }
     }
 }
@@ -1416,8 +1425,18 @@ fun PremiumAiInsightsSection(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Card(colors = CardDefaults.cardColors(containerColor = ZorvynSurface), border = BorderStroke(1.dp, TextSecondary.copy(alpha = 0.1f)), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(20.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .drawBehind {
+                    if (size.width > 0f && size.height > 0f) drawRect(
+                        Brush.linearGradient(listOf(Color(0xFF1A1040), Color(0xFF2D1B69).copy(0.7f)), Offset.Zero, Offset(size.width, size.height))
+                    )
+                }
+                .padding(20.dp)
+        ) {
+            Column {
                 if (isLoading) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         repeat(3) { index ->
@@ -1430,7 +1449,7 @@ fun PremiumAiInsightsSection(
                                     Box(modifier = Modifier.fillMaxWidth(0.6f).height(14.dp).background(premiumShimmerBrush(), RoundedCornerShape(4.dp)))
                                 }
                             }
-                            if (index < 2) { HorizontalDivider(color = TextSecondary.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 16.dp)) }
+                            if (index < 2) { HorizontalDivider(color = geminiPurple.copy(alpha = 0.15f), modifier = Modifier.padding(vertical = 16.dp)) }
                         }
                     }
                 } else if (errorMessage != null) {
@@ -1442,9 +1461,9 @@ fun PremiumAiInsightsSection(
                             modifier = Modifier.size(80.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("Something went wrong", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("Something went wrong", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
-                        Text(errorMessage, color = TextSecondary.copy(alpha = 0.7f), fontSize = 13.sp, textAlign = TextAlign.Center, lineHeight = 18.sp)
+                        Text(errorMessage, color = Color(0xFFA78BFA).copy(alpha = 0.6f), fontSize = 13.sp, textAlign = TextAlign.Center, lineHeight = 18.sp)
                         Spacer(modifier = Modifier.height(12.dp))
                         Text("Tap Refresh to try again", color = geminiPurple.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
@@ -1457,15 +1476,15 @@ fun PremiumAiInsightsSection(
                             modifier = Modifier.size(80.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("No insights yet", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("No insights yet", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
-                        Text("Tap Refresh to let Gemini AI analyse your\nspending patterns", color = TextSecondary.copy(alpha = 0.6f), fontSize = 13.sp, textAlign = TextAlign.Center, lineHeight = 18.sp)
+                        Text("Tap Refresh to let Gemini AI analyse your\nspending patterns", color = Color(0xFFA78BFA).copy(alpha = 0.5f), fontSize = 13.sp, textAlign = TextAlign.Center, lineHeight = 18.sp)
                     }
                 } else {
                     val colors = listOf(ZorvynGreen, ZorvynRed, Color(0xFFE5C158))
                     insights.take(3).forEachIndexed { index, insightText ->
                         PremiumInsightItem(color = colors[index % colors.size], text = insightText)
-                        if (index < insights.size - 1 && index < 2) { HorizontalDivider(color = TextSecondary.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 16.dp)) }
+                        if (index < insights.size - 1 && index < 2) { HorizontalDivider(color = geminiPurple.copy(alpha = 0.15f), modifier = Modifier.padding(vertical = 16.dp)) }
                     }
                 }
             }
@@ -1476,11 +1495,16 @@ fun PremiumAiInsightsSection(
 @Composable
 fun PremiumScannerCard(isLoading: Boolean, onClick: () -> Unit) {
     val premiumGold = Color(0xFFE5C158)
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(enabled = !isLoading) { onClick() },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C2238)),
-        border = BorderStroke(1.dp, premiumGold.copy(alpha = 0.3f))
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .drawBehind {
+                if (size.width > 0f && size.height > 0f) drawRect(
+                    Brush.linearGradient(listOf(Color(0xFF2A1507), Color(0xFF78350F).copy(0.4f)), Offset.Zero, Offset(size.width, size.height))
+                )
+            }
+            .clickable(enabled = !isLoading) { onClick() }
     ) {
         Row(
             modifier = Modifier.padding(20.dp).fillMaxWidth(),
@@ -1489,7 +1513,7 @@ fun PremiumScannerCard(isLoading: Boolean, onClick: () -> Unit) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier.size(48.dp).background(premiumGold.copy(alpha = 0.1f), CircleShape),
+                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(premiumGold.copy(alpha = 0.1f)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (isLoading) {
@@ -1500,13 +1524,13 @@ fun PremiumScannerCard(isLoading: Boolean, onClick: () -> Unit) {
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
-                    Text("Magic Receipt Scanner", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Magic Receipt Scanner", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(if (isLoading) "Extracting data with ML Kit..." else "Upload an image to auto-fill", color = TextSecondary.copy(alpha = 0.8f), fontSize = 13.sp)
+                    Text(if (isLoading) "Extracting data with ML Kit..." else "Upload an image to auto-fill", color = Color(0xFFFBBF24).copy(alpha = 0.4f), fontSize = 13.sp)
                 }
             }
             if (!isLoading) {
-                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextSecondary.copy(alpha = 0.5f))
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFFFBBF24).copy(alpha = 0.4f))
             }
         }
     }
@@ -1536,7 +1560,7 @@ fun RecentTransactionsSection(transactions: List<Transaction>, onDelete: (Transa
         }
         Spacer(modifier = Modifier.height(20.dp))
         if (transactions.isEmpty()) {
-            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp).background(ZorvynSurface, RoundedCornerShape(20.dp)).border(1.dp, TextSecondary.copy(alpha = 0.1f), RoundedCornerShape(20.dp)), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp).clip(RoundedCornerShape(20.dp)).drawBehind { if (size.width > 0f && size.height > 0f) drawRect(Brush.linearGradient(listOf(Color(0xFF1A1A22), Color(0xFF1E1036).copy(0.6f)), Offset.Zero, Offset(size.width, size.height))) }, contentAlignment = Alignment.Center) {
                 Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = TextSecondary.copy(alpha = 0.3f), modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.height(16.dp))

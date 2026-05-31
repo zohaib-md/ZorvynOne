@@ -113,8 +113,7 @@ fun ScoreScreen(
     val animatedScore by animateIntAsState(targetValue = projectedScore, animationSpec = tween(500), label = "score_anim")
 
     Scaffold(
-        containerColor = ZorvynBackground,
-        bottomBar = { BottomNavBar(currentRoute = "score", onHomeClick = onNavigateHome, onTxnsClick = onNavigateTxns, onAddClick = onNavigateAdd, onInsightsClick = onNavigateInsights, onScoreNavClick = {}) }
+        containerColor = ZorvynBackground
     ) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 20.dp).verticalScroll(rememberScrollState())) {
             Spacer(modifier = Modifier.height(24.dp))

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.project.zorvynone.BuildConfig
 import com.project.zorvynone.model.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -52,6 +53,18 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
     val totalAllSavings: StateFlow<Double> = dao.getTotalAllSavings()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
+    // Round-up event channel — UI collects this to ask user before depositing
+    data class RoundUpEvent(val amount: Int, val vaultName: String, val vaultId: Int, val expenseAmount: Int, val category: String)
+    private val _roundUpEvent = Channel<RoundUpEvent>(Channel.BUFFERED)
+    val roundUpEvent = _roundUpEvent.receiveAsFlow()
+
+    /** Called by UI when user taps "Deposit" on the round-up snackbar */
+    fun confirmRoundUp(vaultId: Int, amount: Int) {
+        depositToVault(vaultId, amount.toDouble(), "round_up")
+    }
+
+    fun getDepositsForGoal(goalId: Int): Flow<List<SavingsDeposit>> = dao.getDepositsForGoal(goalId)
+
     fun createVault(title: String, target: Double, deadlineMillis: Long, emoji: String, roundUp: Int) {
         viewModelScope.launch {
             val isFirst = allVaults.value.isEmpty()
@@ -92,9 +105,9 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
 
     /**
      * Called automatically after every expense transaction.
-     * Rounds up to the nearest rule amount and deposits the difference.
+     * Calculates round-up and ASKS the user via event instead of auto-depositing.
      */
-    private fun processRoundUp(expenseAmount: Int) {
+    private fun processRoundUp(expenseAmount: Int, category: String) {
         val defaultVault = allVaults.value.firstOrNull { it.isDefaultRoundUpVault && it.roundUpRule > 0 }
             ?: return
 
@@ -103,8 +116,8 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
         val roundUpAmount = roundedUp - expenseAmount
 
         if (roundUpAmount > 0) {
-            depositToVault(defaultVault.id, roundUpAmount.toDouble(), "round_up")
-            Log.d("ZorvynVaults", "Round-up: ₹$expenseAmount → ₹$roundedUp (saved ₹$roundUpAmount to '${defaultVault.title}')")
+            _roundUpEvent.trySend(RoundUpEvent(roundUpAmount, defaultVault.title, defaultVault.id, expenseAmount, category))
+            Log.d("ZorvynVaults", "Round-up offer: ₹$expenseAmount → ₹$roundedUp (₹$roundUpAmount to '${defaultVault.title}')")
         }
     }
 
@@ -734,9 +747,9 @@ class HomeViewModel(private val dao: TransactionDao) : ViewModel() {
         viewModelScope.launch {
             dao.insertTransaction(Transaction(0, note ?: category, category, amount, isIncome, category, dateMillis, note, icon))
 
-            // 🔄 Auto Round-Up: process after every expense
+            // 🔄 Round-Up: ask user after every expense
             if (!isIncome) {
-                processRoundUp(amount)
+                processRoundUp(amount, category)
             }
 
             // 🔥 Update streak after each transaction

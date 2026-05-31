@@ -15,11 +15,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
@@ -35,6 +40,7 @@ import java.util.Locale
 import com.project.zorvynone.R
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 
@@ -99,8 +105,28 @@ fun InsightsScreen(viewModel: HomeViewModel, onNavigateHome: () -> Unit, onNavig
                 colors = CardDefaults.cardColors(containerColor = ZorvynSurface)
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
-                    Text("Spending by Category", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Custom hand-drawn segmented ring icon
+                        val iconAccent = Color(0xFFA78BFA)
+                        Box(
+                            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
+                                .background(iconAccent.copy(0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Canvas(modifier = Modifier.size(20.dp)) {
+                                val stroke = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                                val pad = 2.dp.toPx()
+                                val arcSize = androidx.compose.ui.geometry.Size(size.width - pad * 2, size.height - pad * 2)
+                                val topLeft = Offset(pad, pad)
+                                drawArc(color = Color(0xFFC4B5FD), startAngle = -90f, sweepAngle = 130f, useCenter = false, topLeft = topLeft, size = arcSize, style = stroke)
+                                drawArc(color = Color(0xFF8B5CF6), startAngle = 50f, sweepAngle = 100f, useCenter = false, topLeft = topLeft, size = arcSize, style = stroke)
+                                drawArc(color = Color(0xFF6D28D9), startAngle = 160f, sweepAngle = 100f, useCenter = false, topLeft = topLeft, size = arcSize, style = stroke)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("SPENDING BY CATEGORY", color = TextSecondary.copy(0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                    }
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     if (expensesByCategory.isEmpty()) {
                         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -138,8 +164,23 @@ fun InsightsScreen(viewModel: HomeViewModel, onNavigateHome: () -> Unit, onNavig
                 colors = CardDefaults.cardColors(containerColor = ZorvynSurface)
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
-                    Text("Top Spending Categories", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val growthLottie by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.growth_chart))
+                        Box(
+                            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
+                                .background(TextSecondary.copy(0.08f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            LottieAnimation(
+                                composition = growthLottie,
+                                iterations = LottieConstants.IterateForever,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("TOP SPENDING", color = TextSecondary.copy(0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                    }
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     if (expensesByCategory.isEmpty()) {
                         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -169,36 +210,17 @@ fun InsightsScreen(viewModel: HomeViewModel, onNavigateHome: () -> Unit, onNavig
 fun InsightsHeader(currentMonth: String) {
     val premiumGold = Color(0xFFE5C158)
 
-    val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-    val greeting = when (currentHour) {
-        in 5..11 -> "GOOD MORNING"
-        in 12..16 -> "GOOD AFTERNOON"
-        in 17..20 -> "GOOD EVENING"
-        else -> "GOOD NIGHT"
-    }
-
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top
     ) {
-        // Left Side: Greeting & Big Typography
+        // Left: Big Typography
         Column {
-            Box(
-                modifier = Modifier
-                    .border(1.dp, premiumGold.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
-                    .background(premiumGold.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text("• $greeting", color = premiumGold, fontSize = 11.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
             Text(
                 buildAnnotatedString {
-                    withStyle(SpanStyle(color = TextPrimary)) { append("Insights,\n") }
-                    withStyle(SpanStyle(color = premiumGold)) { append("fully in focus.") }
+                    withStyle(SpanStyle(color = TextPrimary)) { append("Numbers that\n") }
+                    withStyle(SpanStyle(color = premiumGold, fontStyle = FontStyle.Italic)) { append("think for you.") }
                 },
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Black,
@@ -218,6 +240,7 @@ fun InsightsHeader(currentMonth: String) {
         }
     }
 }
+
 
 @Composable
 fun EmptyStateWithLottie(lottieRawId: Int, title: String, subtitle: String) {
@@ -243,18 +266,43 @@ fun EmptyStateWithLottie(lottieRawId: Int, title: String, subtitle: String) {
 @Composable
 fun InsightSummaryCard(modifier: Modifier = Modifier, title: String, amount: Int, subtitle: String, color: Color) {
     val formatter = NumberFormat.getNumberInstance(Locale("en", "IN"))
+    // Choose gradient based on card type
+    val bgDark = if (title == "SAVED") Color(0xFF0A2520) else Color(0xFF2A0F1A)
+    val bgLight = if (title == "SAVED") Color(0xFF134E4A).copy(0.7f) else Color(0xFF5B2150).copy(0.6f)
+    val accent = if (title == "SAVED") Color(0xFF5EEAD4) else Color(0xFFFB7185)
+
     Box(
         modifier = modifier
-            .background(ZorvynSurface, RoundedCornerShape(16.dp))
-            .border(1.dp, color.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-            .padding(16.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .drawBehind {
+                if (size.width > 0f && size.height > 0f) drawRect(
+                    Brush.linearGradient(listOf(bgDark, bgLight), Offset.Zero, Offset(size.width, size.height))
+                )
+            }
+            .padding(18.dp)
     ) {
         Column {
-            Text(title, color = TextSecondary, fontSize = 12.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("₹${formatter.format(amount)}", color = color, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(subtitle, color = color.copy(alpha = 0.8f), fontSize = 12.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val lottieRes = if (title == "SAVED") R.raw.investment else R.raw.arrows
+                val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(lottieRes))
+                Box(
+                    modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
+                        .background(accent.copy(0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    LottieAnimation(
+                        composition = composition,
+                        iterations = LottieConstants.IterateForever,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(title, color = accent.copy(0.7f), fontSize = 9.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text("₹${formatter.format(amount)}", color = accent, fontSize = 22.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.5).sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(subtitle, color = accent.copy(alpha = 0.4f), fontSize = 11.sp)
         }
     }
 }

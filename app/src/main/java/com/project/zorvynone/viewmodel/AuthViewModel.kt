@@ -131,7 +131,9 @@ class AuthViewModel : ViewModel() {
     fun signOut() {
         auth.signOut()
         _authState.value = AuthState.Idle
-        Log.d("AuthVM", "User signed out")
+        // Clear the DB singleton so the next login opens a fresh per-user DB
+        com.project.zorvynone.model.AppDatabase.clearInstance()
+        Log.d("AuthVM", "User signed out — DB instance cleared")
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

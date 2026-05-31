@@ -40,7 +40,7 @@ val bottomNavItems = listOf(
     NavItem("transactions", "History", Icons.Filled.Receipt, Icons.Outlined.Receipt),
     NavItem("add_transaction", "Add", Icons.Filled.AddCircle, Icons.Outlined.AddCircle),
     NavItem("insights", "Insights", Icons.Filled.Insights, Icons.Outlined.Insights),
-    NavItem("score", "Score", Icons.Filled.Speed, Icons.Outlined.Speed)
+    NavItem("savings", "Vaults", Icons.Filled.Savings, Icons.Outlined.Savings)
 )
 
 @Composable
