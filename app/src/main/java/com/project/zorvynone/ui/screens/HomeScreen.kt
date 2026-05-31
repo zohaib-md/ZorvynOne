@@ -82,6 +82,8 @@ import com.project.zorvynone.ui.theme.*
 import com.project.zorvynone.viewmodel.HomeViewModel
 import com.project.zorvynone.KommunicateHelper
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 
@@ -1547,29 +1549,90 @@ fun PremiumInsightItem(color: Color, text: String) {
 
 @Composable
 fun RecentTransactionsSection(transactions: List<Transaction>, onDelete: (Transaction) -> Unit) {
+    val premiumGold = Color(0xFFE5C158)
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Recent", color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Swipe left to delete 👈", color = TextSecondary.copy(alpha = 0.4f), fontSize = 11.sp)
-                Spacer(modifier = Modifier.width(16.dp))
-                Text("All", color = ZorvynBlueText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = ZorvynBlueText, modifier = Modifier.size(16.dp))
+        // ── Header ────────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("Recent", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                if (transactions.isNotEmpty()) {
+                    Text(
+                        "${transactions.size} transaction${if (transactions.size > 1) "s" else ""}",
+                        color = TextSecondary.copy(0.5f),
+                        fontSize = 12.sp
+                    )
+                }
+            }
+            // Swipe hint — dark asymmetric cut-corner tag
+            Box(
+                modifier = Modifier
+                    .clip(androidx.compose.foundation.shape.CutCornerShape(topStart = 10.dp))
+                    .drawBehind {
+                        drawRect(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF1C1C26), Color(0xFF141419)),
+                                Offset.Zero, Offset(size.width, size.height)
+                            )
+                        )
+                        // left accent line
+                        drawLine(
+                            color = Color(0xFF6366F1).copy(0.7f),
+                            start = Offset(0f, size.height * 0.35f),
+                            end = Offset(0f, size.height),
+                            strokeWidth = 2.5f
+                        )
+                    }
+                    .padding(horizontal = 12.dp, vertical = 7.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SwipeLeft, null,
+                        tint = Color(0xFF6366F1).copy(0.75f),
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Text(
+                        "swipe to delete",
+                        color = TextSecondary.copy(0.4f),
+                        fontSize = 10.sp,
+                        letterSpacing = 0.3.sp
+                    )
+                }
             }
         }
-        Spacer(modifier = Modifier.height(20.dp))
+
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         if (transactions.isEmpty()) {
-            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp).clip(RoundedCornerShape(20.dp)).drawBehind { if (size.width > 0f && size.height > 0f) drawRect(Brush.linearGradient(listOf(Color(0xFF1A1A22), Color(0xFF1E1036).copy(0.6f)), Offset.Zero, Offset(size.width, size.height))) }, contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(ZorvynSurface),
+                contentAlignment = Alignment.Center
+            ) {
                 Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = TextSecondary.copy(alpha = 0.3f), modifier = Modifier.size(48.dp))
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("No transactions yet", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    Icon(Icons.Default.ReceiptLong, null, tint = TextSecondary.copy(0.25f), modifier = Modifier.size(48.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("No transactions yet", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text("Add your first one!", color = TextSecondary.copy(0.5f), fontSize = 13.sp)
                 }
             }
         } else {
-            transactions.forEach { txn ->
-                key(txn.hashCode()) { SwipeableTransactionItem(txn = txn, onDelete = { onDelete(txn) }); Spacer(modifier = Modifier.height(16.dp)) }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                transactions.forEach { txn ->
+                    key(txn.hashCode()) {
+                        SwipeableTransactionItem(txn = txn, onDelete = { onDelete(txn) })
+                    }
+                }
             }
         }
     }
@@ -1578,84 +1641,180 @@ fun RecentTransactionsSection(transactions: List<Transaction>, onDelete: (Transa
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeableTransactionItem(txn: Transaction, onDelete: () -> Unit) {
-    val dismissState = rememberSwipeToDismissBoxState(confirmValueChange = { dismissValue -> if (dismissValue == SwipeToDismissBoxValue.EndToStart) { onDelete(); true } else false })
-    SwipeToDismissBox(state = dismissState, enableDismissFromStartToEnd = false, backgroundContent = {
-        val color by animateColorAsState(targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart) ZorvynRed else Color.Transparent, label = "")
-        Box(modifier = Modifier.fillMaxSize().background(color, RoundedCornerShape(16.dp)).padding(end = 24.dp), contentAlignment = Alignment.CenterEnd) { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.White) }
-    }, content = {
-        Box(modifier = Modifier.background(ZorvynBackground)) {
-            val iconVec = when(txn.iconType) {
-                IconType.WALLET -> Icons.Default.AccountBalanceWallet
-                IconType.CAFE -> Icons.Default.LocalCafe
-                IconType.SHOPPING -> Icons.Default.ShoppingCart
-                IconType.FOOD -> Icons.Default.Restaurant
-                IconType.HOUSING -> Icons.Default.Home
-                IconType.TRANSPORT -> Icons.Default.DirectionsCar
-                IconType.SALARY -> Icons.Default.Payments
-                IconType.DEFAULT -> Icons.Default.Receipt
-            }
-            val sign = if (txn.isIncome) "+" else "-"
-            val formattedAmt = NumberFormat.getNumberInstance(Locale("en", "IN")).format(txn.amount)
-            TransactionItem(icon = iconVec, title = txn.title, subtitle = txn.subtitle, amount = "$sign₹$formattedAmt", isIncome = txn.isIncome)
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { dismissValue ->
+            if (dismissValue == SwipeToDismissBoxValue.EndToStart) { onDelete(); true } else false
         }
-    })
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            val color by animateColorAsState(
+                targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart)
+                    ZorvynRed else Color.Transparent,
+                label = ""
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color.Transparent, ZorvynRed.copy(0.9f)),
+                            Offset.Zero, Offset(Float.MAX_VALUE, 0f)
+                        )
+                    )
+                    .padding(end = 24.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Delete, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    Text("Delete", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        content = {
+            Box(modifier = Modifier.background(ZorvynBackground)) {
+                val (iconVec, categoryColor) = when (txn.iconType) {
+                    IconType.WALLET   -> Pair(Icons.Default.AccountBalanceWallet, Color(0xFF6366F1))
+                    IconType.CAFE     -> Pair(Icons.Default.LocalCafe, Color(0xFFF59E0B))
+                    IconType.SHOPPING -> Pair(Icons.Default.ShoppingCart, Color(0xFFEC4899))
+                    IconType.FOOD     -> Pair(Icons.Default.Restaurant, Color(0xFFEF4444))
+                    IconType.HOUSING  -> Pair(Icons.Default.Home, Color(0xFF8B5CF6))
+                    IconType.TRANSPORT -> Pair(Icons.Default.DirectionsCar, Color(0xFF3B82F6))
+                    IconType.SALARY   -> Pair(Icons.Default.Payments, Color(0xFF10B981))
+                    IconType.DEFAULT  -> Pair(Icons.Default.Receipt, Color(0xFF6B7280))
+                }
+                val sign = if (txn.isIncome) "+" else "-"
+                val formattedAmt = NumberFormat.getNumberInstance(Locale("en", "IN")).format(txn.amount)
+                val dateStr = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(txn.date))
+                PremiumTransactionItem(
+                    icon = iconVec,
+                    categoryColor = categoryColor,
+                    title = txn.title,
+                    subtitle = txn.subtitle,
+                    amount = "$sign₹$formattedAmt",
+                    date = dateStr,
+                    isIncome = txn.isIncome
+                )
+            }
+        }
+    )
 }
 
 @Composable
 fun TransactionItem(icon: ImageVector, title: String, subtitle: String, amount: String, isIncome: Boolean) {
-    // Premium icon styling — neutral surface with white icon, CRED-style
-    val iconSurface = Color(0xFF0D0F12)
-    val iconBorder = Color.White.copy(alpha = 0.08f)
-    val iconTintColor = Color.White.copy(alpha = 0.85f)
+    PremiumTransactionItem(
+        icon = icon,
+        categoryColor = Color(0xFF6B7280),
+        title = title,
+        subtitle = subtitle,
+        amount = amount,
+        date = "",
+        isIncome = isIncome
+    )
+}
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+@Composable
+fun PremiumTransactionItem(
+    icon: ImageVector,
+    categoryColor: Color,
+    title: String,
+    subtitle: String,
+    amount: String,
+    date: String,
+    isIncome: Boolean
+) {
+    val amountColor = if (isIncome) Color(0xFF22C55E) else Color(0xFFEF4444)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(ZorvynSurface)
+            .border(1.dp, Color.White.copy(0.05f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Premium icon container — dark surface, subtle border, white icon
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(iconSurface, RoundedCornerShape(14.dp))
-                    .border(1.dp, iconBorder, RoundedCornerShape(14.dp)),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTintColor,
-                    modifier = Modifier.size(22.dp)
-                )
+                // Colored icon badge
+                Box(contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(categoryColor.copy(0.25f), categoryColor.copy(0.08f))
+                                ),
+                                RoundedCornerShape(16.dp)
+                            )
+                            .border(1.dp, categoryColor.copy(0.2f), RoundedCornerShape(16.dp))
+                    )
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = categoryColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                // Title + subtitle
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        color = TextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            subtitle.ifBlank { "Uncategorized" },
+                            color = categoryColor.copy(0.75f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        if (date.isNotBlank()) {
+                            Text("·", color = TextSecondary.copy(0.3f), fontSize = 12.sp)
+                            Text(date, color = TextSecondary.copy(0.45f), fontSize = 12.sp)
+                        }
+                    }
+                }
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Amount — large, bold, colored
+            Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = title,
-                    color = TextPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    text = amount,
+                    color = amountColor,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.5).sp
                 )
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(subtitle, color = TextSecondary.copy(alpha = 0.6f), fontSize = 13.sp)
+                // Income/expense indicator dot
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(top = 4.dp)
+                        .size(6.dp)
+                        .background(amountColor.copy(0.5f), CircleShape)
+                )
             }
         }
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        // Only the amount stays colored
-        Text(
-            text = amount,
-            color = if (isIncome) ZorvynGreen else ZorvynRed,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
     }
 }
 
