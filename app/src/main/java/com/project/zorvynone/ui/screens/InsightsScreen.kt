@@ -86,7 +86,7 @@ fun InsightsScreen(viewModel: HomeViewModel, onNavigateHome: () -> Unit, onNavig
             Spacer(modifier = Modifier.height(24.dp))
 
             // NEW: Custom Unrestricted Header
-            InsightsHeader(currentMonth = currentMonth)
+            InsightsHeader(currentMonth = currentMonth, totalExpense = totalExpense, categoryCount = expensesByCategory.size)
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -207,36 +207,57 @@ fun InsightsScreen(viewModel: HomeViewModel, onNavigateHome: () -> Unit, onNavig
 
 // --- NEW CUSTOM COMPOSABLE: UNRESTRICTED HEADER ---
 @Composable
-fun InsightsHeader(currentMonth: String) {
+fun InsightsHeader(currentMonth: String, totalExpense: Int = 0, categoryCount: Int = 0) {
     val premiumGold = Color(0xFFE5C158)
+    val fmt = NumberFormat.getNumberInstance(Locale("en", "IN"))
+    val statusLine = when {
+        totalExpense == 0 -> "No spending data recorded for $currentMonth yet."
+        categoryCount > 0 -> "₹${fmt.format(totalExpense)} spent across $categoryCount categor${if (categoryCount > 1) "ies" else "y"}"
+        else -> "₹${fmt.format(totalExpense)} spent in $currentMonth"
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left: Big Typography
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
+            // Premium serif title
             Text(
-                buildAnnotatedString {
-                    withStyle(SpanStyle(color = TextPrimary)) { append("Numbers that\n") }
-                    withStyle(SpanStyle(color = premiumGold, fontStyle = FontStyle.Italic)) { append("think for you.") }
-                },
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Black,
-                lineHeight = 36.sp,
-                letterSpacing = (-1).sp
+                "Insights",
+                color = Color.White,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = PlayfairDisplay,
+                letterSpacing = (-0.5).sp
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            // Thin gold accent rule
+            Box(
+                modifier = Modifier
+                    .width(36.dp)
+                    .height(2.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(premiumGold, premiumGold.copy(0f))
+                        ),
+                        RoundedCornerShape(1.dp)
+                    )
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                statusLine,
+                color = TextSecondary.copy(0.6f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Normal
             )
         }
-
-        // Right Side: Date Pill
         Box(
             modifier = Modifier
                 .background(ZorvynSurface, RoundedCornerShape(12.dp))
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            Text(currentMonth, color = TextSecondary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(currentMonth, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
         }
     }
 }

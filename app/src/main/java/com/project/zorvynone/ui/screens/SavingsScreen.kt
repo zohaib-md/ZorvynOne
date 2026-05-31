@@ -78,7 +78,7 @@ fun SavingsScreen(viewModel: HomeViewModel) {
         ) {
             // ── HEADER ──
             item {
-                VaultsHeader()
+                VaultsHeader(totalSaved = totalSaved, vaultCount = vaults.size)
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
@@ -130,15 +130,49 @@ fun SavingsScreen(viewModel: HomeViewModel) {
 // ── HEADER ───────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════
 @Composable
-private fun VaultsHeader() {
-    Text(
-        buildAnnotatedString {
-            withStyle(SpanStyle(color = TextPrimary)) { append("Your vaults,\n") }
-            withStyle(SpanStyle(color = premiumGold, fontStyle = FontStyle.Italic)) { append("growing silently.") }
-        },
-        fontSize = 30.sp, fontWeight = FontWeight.Black, lineHeight = 34.sp, letterSpacing = (-1).sp
-    )
+private fun VaultsHeader(totalSaved: Double = 0.0, vaultCount: Int = 0) {
+    val premiumGold = Color(0xFFE5C158)
+    val fmt = NumberFormat.getNumberInstance(Locale("en", "IN"))
+
+    val statusLine = when {
+        vaultCount == 0 -> "Ring-fence money for a goal. Each vault is a separate savings pocket."
+        totalSaved > 0 -> "₹${fmt.format(totalSaved.toLong())} set aside in $vaultCount goal${if (vaultCount > 1) "s" else ""}. Tap a vault to top up."
+        else -> "$vaultCount savings pocket${if (vaultCount > 1) "s" else ""} active. Start adding to reach your goals."
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "Vaults",
+            color = Color.White,
+            fontSize = 30.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = PlayfairDisplay,
+            letterSpacing = (-0.5).sp
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        // Thin gold accent rule
+        Box(
+            modifier = Modifier
+                .width(36.dp)
+                .height(2.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(premiumGold, premiumGold.copy(0f))
+                    ),
+                    RoundedCornerShape(1.dp)
+                )
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            statusLine,
+            color = TextSecondary.copy(0.6f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Normal,
+            lineHeight = 19.sp
+        )
+    }
 }
+
 
 
 // ═══════════════════════════════════════════════════════════════

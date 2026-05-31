@@ -363,7 +363,7 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(16.dp))
             ExpectrBranding(onSignOut = onSignOut)
             Spacer(modifier = Modifier.height(24.dp))
-            PremiumHomeHeader()
+            PremiumHomeHeader(expense = expense, income = income, txnCount = transactions.size)
             Spacer(modifier = Modifier.height(32.dp))
 
             TitaniumDebitCard(balance = balance, score = currentScore)
@@ -651,69 +651,97 @@ fun QuickActionCard(
 @Composable
 fun RoastTriggerPill(onClick: () -> Unit) {
     val fireLottie by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.fire))
-    val infiniteTransition = rememberInfiniteTransition(label = "pill_glow")
+    val infiniteTransition = rememberInfiniteTransition(label = "roast_glow")
     val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.15f, targetValue = 0.45f,
-        animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "pill_pulse"
+        initialValue = 0.2f, targetValue = 0.55f,
+        animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "roast_pulse"
     )
 
-    val fireRed = Color(0xFFEF4444)
-    val fireOrange = Color(0xFFF97316)
-    val fireYellow = Color(0xFFFBBF24)
+    val ember = Color(0xFFE8630A)        // deep burnt amber — not the generic red
+    val emberLight = Color(0xFFF0954A)
+    val cardBg = Color(0xFF16120E)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .background(
-                Brush.horizontalGradient(
-                    listOf(fireRed.copy(alpha = 0.15f), fireOrange.copy(alpha = 0.08f), Color.Transparent)
-                ),
-                RoundedCornerShape(18.dp)
-            )
-            .border(
-                1.dp,
-                Brush.horizontalGradient(
-                    listOf(fireOrange.copy(glowAlpha), fireYellow.copy(glowAlpha * 0.5f), Color.Transparent)
-                ),
-                RoundedCornerShape(18.dp)
-            )
-            .clickable { onClick() },
-        contentAlignment = Alignment.CenterStart
+            .clip(RoundedCornerShape(20.dp))
+            .drawBehind {
+                // deep dark card bg
+                drawRect(cardBg)
+                // subtle ember glow along the top edge
+                drawRect(
+                    Brush.verticalGradient(
+                        listOf(ember.copy(glowAlpha * 0.35f), Color.Transparent),
+                        startY = 0f, endY = size.height * 0.5f
+                    )
+                )
+                // left accent bar
+                drawRect(
+                    Brush.verticalGradient(listOf(emberLight, ember.copy(0.3f))),
+                    size = androidx.compose.ui.geometry.Size(3.5f, size.height)
+                )
+            }
+            .border(1.dp, ember.copy(0.18f), RoundedCornerShape(20.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 20.dp, vertical = 18.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            LottieAnimation(
-                composition = fireLottie,
-                iterations = LottieConstants.IterateForever,
-                modifier = Modifier.size(36.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
+            // Fire lottie in a dark ember-tinted box
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(ember.copy(0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                LottieAnimation(
+                    composition = fireLottie,
+                    iterations = LottieConstants.IterateForever,
+                    modifier = Modifier.size(38.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "Roast My Spending",
-                    color = fireOrange,
+                    color = emberLight,
                     fontSize = 15.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.2).sp
                 )
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    "Let AI roast your habits",
-                    color = Color(0xFFB07A50),
-                    fontSize = 11.sp
+                    "Gemini AI judges your habits",
+                    color = ember.copy(0.55f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowForward,
-                null,
-                tint = fireOrange.copy(0.6f),
-                modifier = Modifier.size(18.dp)
-            )
+
+            // Arrow badge
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(ember.copy(0.12f), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForward,
+                    null,
+                    tint = ember.copy(0.8f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }
+
 
 @Composable
 fun ExpectrBranding(onSignOut: () -> Unit = {}) {
@@ -1062,52 +1090,48 @@ private fun SidebarMenuItem(
 }
 
 @Composable
-fun PremiumHomeHeader() {
-    val premiumGold = Color(0xFFE5C158)
-
-    val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-    val greetingWord = when (currentHour) {
-        in 5..11 -> "good morning"
-        in 12..16 -> "good afternoon"
-        in 17..20 -> "good evening"
-        else -> "good night"
-    }
-
-    // Personalize with Firebase user name
+fun PremiumHomeHeader(expense: Int = 0, income: Int = 0, txnCount: Int = 0) {
     val firebaseUser = FirebaseAuth.getInstance().currentUser
     val firstName = firebaseUser?.displayName
         ?.split(" ")?.firstOrNull()?.replaceFirstChar { it.uppercase() }
         ?: "there"
 
+    val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    val greeting = when (currentHour) {
+        in 5..11 -> "Good morning"
+        in 12..16 -> "Good afternoon"
+        in 17..20 -> "Good evening"
+        else -> "Good night"
+    }
+
+    val fmt = NumberFormat.getNumberInstance(Locale("en", "IN"))
+    val statusLine = when {
+        txnCount == 0 -> "No transactions yet — start tracking."
+        expense > 0 && income > 0 -> "₹${fmt.format(expense)} spent · ₹${fmt.format(income)} earned"
+        expense > 0 -> "₹${fmt.format(expense)} spent · $txnCount transaction${if (txnCount > 1) "s" else ""}"
+        else -> "$txnCount transaction${if (txnCount > 1) "s" else ""} recorded"
+    }
+
     Column(modifier = Modifier.fillMaxWidth()) {
-        // --- Personalized greeting — Playfair Display Bold ---
         Text(
-            text = "Hi $firstName, $greetingWord",
+            text = "$greeting, $firstName.",
             color = Color.White,
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = PlayfairDisplay,
             letterSpacing = (-0.3).sp
         )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // --- Hero headline — Playfair Display Bold ---
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = buildAnnotatedString {
-                withStyle(SpanStyle(color = TextPrimary)) { append("Your wealth,\n") }
-                withStyle(SpanStyle(color = premiumGold)) { append("always awake.") }
-            },
-            fontSize = 36.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = PlayfairDisplay,
-            lineHeight = 42.sp,
-            letterSpacing = (-0.5).sp
+            text = statusLine,
+            color = TextSecondary.copy(0.6f),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Normal
         )
-
         Spacer(modifier = Modifier.height(12.dp))
     }
 }
+
 
 // --- TITANIUM DEBIT CARD ---
 

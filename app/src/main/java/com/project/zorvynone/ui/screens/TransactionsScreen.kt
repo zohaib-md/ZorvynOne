@@ -99,25 +99,58 @@ fun TransactionsScreen(viewModel: HomeViewModel, onNavigateHome: () -> Unit, onN
             item {
                 Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                     Spacer(modifier = Modifier.height(20.dp))
+
+                    // Small muted label — acts as a "kicker" above the hero word
                     Text(
-                        text = "TRANSACTION HISTORY",
-                        color = TextSecondary.copy(alpha = 0.5f),
+                        text = "EVERY RUPEE,",
+                        color = premiumGold.copy(0.5f),
                         fontSize = 11.sp,
-                        letterSpacing = 2.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 3.sp
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    // Hero word — massive PlayfairDisplay Black
                     Text(
-                        buildAnnotatedString {
-                            withStyle(SpanStyle(color = TextPrimary)) { append("Every ") }
-                            withStyle(SpanStyle(color = premiumGold, fontStyle = FontStyle.Italic)) { append("Rupee,") }
-                            withStyle(SpanStyle(color = TextPrimary)) { append("\nAccounted.") }
-                        },
-                        fontSize = 32.sp,
+                        text = "Accounted.",
+                        color = Color.White,
+                        fontSize = 44.sp,
                         fontWeight = FontWeight.Black,
-                        lineHeight = 36.sp,
-                        letterSpacing = (-1).sp
+                        fontFamily = PlayfairDisplay,
+                        letterSpacing = (-1.5).sp,
+                        lineHeight = 46.sp
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Gold fade rule
+                    Box(
+                        modifier = Modifier
+                            .width(48.dp)
+                            .height(2.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(premiumGold, premiumGold.copy(0f))
+                                ),
+                                RoundedCornerShape(1.dp)
+                            )
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Live data status line
+                    val statusText = when {
+                        transactions.isEmpty() -> "No transactions recorded yet."
+                        netFlow >= 0 -> "${transactions.size} transactions · ₹${fmt.format(netFlow.toInt())} net positive"
+                        else -> "${transactions.size} transactions · ₹${fmt.format((-netFlow).toInt())} net spent"
+                    }
+                    Text(
+                        text = statusText,
+                        color = TextSecondary.copy(0.55f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+
                     Spacer(modifier = Modifier.height(20.dp))
                 }
             }

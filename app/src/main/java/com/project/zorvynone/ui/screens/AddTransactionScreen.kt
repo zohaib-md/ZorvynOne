@@ -113,17 +113,6 @@ fun AddTransactionScreen(
 
     Scaffold(
         containerColor = ZorvynBackground,
-        topBar = {
-            TopAppBar(
-                title = { Text("Add Transaction", color = TextPrimary, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextSecondary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = ZorvynBackground)
-            )
-        }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -132,7 +121,59 @@ fun AddTransactionScreen(
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ── Premium header ──────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(ZorvynSurface, CircleShape)
+                        .clickable { onNavigateBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack, "Back",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        "Add Transaction",
+                        color = Color.White,
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = PlayfairDisplay,
+                        letterSpacing = (-0.5).sp
+                    )
+                    Spacer(modifier = Modifier.height(5.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(36.dp)
+                            .height(2.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(premiumGold, premiumGold.copy(0f))
+                                ),
+                                RoundedCornerShape(1.dp)
+                            )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Log a payment, income or scan a receipt.",
+                        color = TextSecondary.copy(0.55f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             // ── AI INPUT TOOLS (Split Pill) ──
             val scannerLottie by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.document_ocr_scan))
