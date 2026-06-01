@@ -80,7 +80,7 @@ import com.airbnb.lottie.compose.rememberLottieComposition
 import com.project.zorvynone.R
 import com.project.zorvynone.ui.theme.*
 import com.project.zorvynone.viewmodel.HomeViewModel
-import com.project.zorvynone.KommunicateHelper
+
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -122,7 +122,7 @@ fun HomeScreen(
     onInsightsClick: () -> Unit = {},
     onScoreNavClick: () -> Unit = {},
     onSignOut: () -> Unit = {},
-    onChatClick: () -> Unit = {},
+
     onSpendOrSkipClick: () -> Unit = {},
     onBillSplitClick: () -> Unit = {}
 ) {
@@ -245,51 +245,6 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
 
-                // --- OPTION: Ask Experia ---
-                Row(
-                    modifier = Modifier
-                        .graphicsLayer(
-                            alpha = option1Alpha,
-                            translationY = option1Offset
-                        )
-                        .padding(bottom = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    if (isFabExpanded) {
-                        Box(
-                            modifier = Modifier
-                                .shadow(6.dp, RoundedCornerShape(8.dp))
-                                .background(fabSurface, RoundedCornerShape(8.dp))
-                                .border(0.5.dp, fabGold.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                "Ask Experia",
-                                color = fabGold,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                    }
-                    FloatingActionButton(
-                        onClick = {
-                            isFabExpanded = false
-                            onChatClick()
-                        },
-                        containerColor = fabDark,
-                        contentColor = fabGold,
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .border(1.dp, fabGold.copy(alpha = 0.4f), CircleShape),
-                        elevation = FloatingActionButtonDefaults.elevation(6.dp, 10.dp)
-                    ) {
-                        Icon(Icons.Default.SmartToy, contentDescription = "Ask Experia", modifier = Modifier.size(20.dp))
-                    }
-                }
 
                 // --- MAIN FAB (Speed Dial Trigger) ---
                 Box(contentAlignment = Alignment.Center) {
@@ -1842,93 +1797,6 @@ fun PremiumTransactionItem(
     }
 }
 
-// --- EXPERIA CHATBOT CARD ---
-@Composable
-fun ExperiaChatCard(onClick: () -> Unit) {
-    val experiaPurple = Color(0xFFA288E3)
-    val experiaBg = Color(0xFF2A2045)
-
-    val infiniteTransition = rememberInfiniteTransition(label = "experia_glow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "experia_glow_alpha"
-    )
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = experiaBg),
-        border = BorderStroke(1.dp, experiaPurple.copy(alpha = 0.3f))
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(20.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Animated glow icon container
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    experiaPurple.copy(alpha = glowAlpha * 0.4f),
-                                    experiaPurple.copy(alpha = 0.1f)
-                                )
-                            ),
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SmartToy,
-                        contentDescription = "Ask Experia",
-                        tint = experiaPurple,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(
-                        text = "Ask Experia",
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Your AI financial assistant",
-                        color = TextSecondary.copy(alpha = 0.8f),
-                        fontSize = 13.sp
-                    )
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .background(experiaPurple.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "CHAT",
-                    color = experiaPurple,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 1.5.sp
-                )
-            }
-        }
-    }
-}
 
 @Composable
 fun BottomNavBar(

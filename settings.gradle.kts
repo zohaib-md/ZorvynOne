@@ -21,6 +21,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ZorvynOne"
+rootProject.name = "Expectr"
 include(":app")
  

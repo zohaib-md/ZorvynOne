@@ -30,9 +30,20 @@ android {
         buildConfigField("String", "GEMINI_API_KEY", "\"${localProperties.getProperty("GEMINI_API_KEY", "")}\"")
         buildConfigField("String", "WEB_CLIENT_ID", "\"${localProperties.getProperty("WEB_CLIENT_ID", "")}\"")    }
 
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file("expectr-release.jks")
+            storePassword = "expectr123"
+            keyAlias = "expectr"
+            keyPassword = "expectr123"
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -111,7 +122,5 @@ dependencies {
     // --- Coroutines Play Services (for Task.await()) ---
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
-    // --- Kommunicate Chat SDK (Experia Bot) ---
-    implementation("io.kommunicate.sdk:kommunicateui:2.14.5")
 }
 
