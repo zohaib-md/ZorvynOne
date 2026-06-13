@@ -175,127 +175,10 @@ fun HomeScreen(
         }
     }
 
-    // --- PREMIUM SPEED DIAL FAB STATE ---
-    var isFabExpanded by remember { mutableStateOf(false) }
 
-    // Main FAB rotation animation
-    val fabRotation by animateFloatAsState(
-        targetValue = if (isFabExpanded) 135f else 0f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
-        label = "fab_rotation"
-    )
-
-    // Pulsing glow for the main FAB
-    val infiniteTransition = rememberInfiniteTransition(label = "fab_glow")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_alpha"
-    )
-
-    // Speed dial option animations (staggered)
-    val option1Offset by animateFloatAsState(
-        targetValue = if (isFabExpanded) 0f else 80f,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
-        label = "opt1_offset"
-    )
-    val option1Alpha by animateFloatAsState(
-        targetValue = if (isFabExpanded) 1f else 0f,
-        animationSpec = tween(if (isFabExpanded) 200 else 100),
-        label = "opt1_alpha"
-    )
-    val option2Offset by animateFloatAsState(
-        targetValue = if (isFabExpanded) 0f else 60f,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMedium),
-        label = "opt2_offset"
-    )
-    val option2Alpha by animateFloatAsState(
-        targetValue = if (isFabExpanded) 1f else 0f,
-        animationSpec = tween(if (isFabExpanded) 300 else 100, delayMillis = if (isFabExpanded) 50 else 0),
-        label = "opt2_alpha"
-    )
-
-    // Colors
-    val fabGold = Color(0xFFE5C158)
-    val fabDark = Color(0xFF141518)
-    val fabSurface = Color(0xFF1C2238)
 
     Scaffold(
         containerColor = ZorvynBackground,
-        floatingActionButtonPosition = FabPosition.End,
-        floatingActionButton = {
-            Column(
-                modifier = Modifier
-                    .offset(y = (-16).dp)
-                    .padding(end = 4.dp),
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-
-
-                // --- MAIN FAB (Speed Dial Trigger) ---
-                Box(contentAlignment = Alignment.Center) {
-                    // Pulsing glow ring (only when collapsed)
-                    if (!isFabExpanded) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .scale(pulseScale)
-                                .background(
-                                    Brush.radialGradient(
-                                        colors = listOf(
-                                            fabGold.copy(alpha = pulseAlpha),
-                                            Color.Transparent
-                                        )
-                                    ),
-                                    CircleShape
-                                )
-                        )
-                    }
-                    FloatingActionButton(
-                        onClick = { isFabExpanded = !isFabExpanded },
-                        containerColor = fabDark,
-                        contentColor = fabGold,
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .size(56.dp)
-                            .border(
-                                width = 1.5.dp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        fabGold.copy(alpha = 0.8f),
-                                        fabGold.copy(alpha = 0.2f),
-                                        fabGold.copy(alpha = 0.6f)
-                                    )
-                                ),
-                                shape = CircleShape
-                            ),
-                        elevation = FloatingActionButtonDefaults.elevation(10.dp, 14.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (isFabExpanded) Icons.Default.Close else Icons.Default.AutoAwesome,
-                            contentDescription = if (isFabExpanded) "Close" else "AI Assistant",
-                            modifier = Modifier
-                                .size(24.dp)
-                                .graphicsLayer(rotationZ = fabRotation)
-                        )
-                    }
-                }
-            }
-        },
 
         bottomBar = {
             BottomNavBar(
@@ -318,7 +201,14 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(16.dp))
             ExpectrBranding(onSignOut = onSignOut)
             Spacer(modifier = Modifier.height(24.dp))
-            PremiumHomeHeader(expense = expense, income = income, txnCount = transactions.size)
+            PremiumHomeHeader(
+                balance = balance,
+                expense = expense,
+                income = income,
+                txnCount = transactions.size,
+                onAddClick = onAddClick,
+                onTxnsClick = onTxnsClick
+            )
             Spacer(modifier = Modifier.height(32.dp))
 
             TitaniumDebitCard(balance = balance, score = currentScore)
@@ -1045,13 +935,22 @@ private fun SidebarMenuItem(
 }
 
 @Composable
-fun PremiumHomeHeader(expense: Int = 0, income: Int = 0, txnCount: Int = 0) {
+fun PremiumHomeHeader(
+    balance: Int = 0,
+    expense: Int = 0,
+    income: Int = 0,
+    txnCount: Int = 0,
+    onAddClick: () -> Unit = {},
+    onTxnsClick: () -> Unit = {}
+) {
     val firebaseUser = FirebaseAuth.getInstance().currentUser
     val firstName = firebaseUser?.displayName
-        ?.split(" ")?.firstOrNull()?.replaceFirstChar { it.uppercase() }
-        ?: "there"
+        ?.split(" ")?.firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "there"
 
-    val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    val cal = java.util.Calendar.getInstance()
+    val currentHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+    val dayName = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault()).format(cal.time)
+    val dateStr = java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.getDefault()).format(cal.time)
     val greeting = when (currentHour) {
         in 5..11 -> "Good morning"
         in 12..16 -> "Good afternoon"
@@ -1060,35 +959,407 @@ fun PremiumHomeHeader(expense: Int = 0, income: Int = 0, txnCount: Int = 0) {
     }
 
     val fmt = NumberFormat.getNumberInstance(Locale("en", "IN"))
-    val statusLine = when {
-        txnCount == 0 -> "No transactions yet — start tracking."
-        expense > 0 && income > 0 -> "₹${fmt.format(expense)} spent · ₹${fmt.format(income)} earned"
-        expense > 0 -> "₹${fmt.format(expense)} spent · $txnCount transaction${if (txnCount > 1) "s" else ""}"
-        else -> "$txnCount transaction${if (txnCount > 1) "s" else ""} recorded"
-    }
+    val gold = Color(0xFFE5C158)
+    val green = ZorvynGreen
+    val red = ZorvynRed
+    val animatedBalance by animateIntAsState(
+        targetValue = balance,
+        animationSpec = tween(1400, easing = FastOutSlowInEasing),
+        label = "bal"
+    )
+    val spendRatio = if (income > 0) (expense.toFloat() / income.toFloat()).coerceIn(0f, 1f) else 0f
+    val animatedSpend by animateFloatAsState(
+        targetValue = spendRatio,
+        animationSpec = tween(1600, easing = FastOutSlowInEasing),
+        label = "spend"
+    )
 
     Column(modifier = Modifier.fillMaxWidth()) {
+
+        // ── Dateline row ─────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "$dayName, $dateStr".uppercase(),
+                color = TextSecondary.copy(0.4f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.5.sp
+            )
+            Text(
+                when (currentHour) {
+                    in 5..11 -> "☀ Morning"
+                    in 12..16 -> "◑ Afternoon"
+                    in 17..20 -> "◐ Evening"
+                    else -> "☽ Night"
+                },
+                color = gold.copy(0.55f),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.5.sp
+            )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // ── Editorial greeting ───────────────────────────────────────────────
         Text(
-            text = "$greeting, $firstName.",
+            "$greeting,",
+            color = TextSecondary.copy(0.55f),
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Normal,
+            fontFamily = PlayfairDisplay,
+            letterSpacing = (-0.2).sp
+        )
+        Text(
+            "$firstName.",
             color = Color.White,
-            fontSize = 26.sp,
+            fontSize = 34.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = PlayfairDisplay,
-            letterSpacing = (-0.3).sp
+            letterSpacing = (-0.8).sp,
+            lineHeight = 36.sp
         )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Gold accent rule
+        Box(
+            modifier = Modifier
+                .width(40.dp)
+                .height(2.dp)
+                .background(
+                    Brush.horizontalGradient(listOf(gold, gold.copy(0f))),
+                    RoundedCornerShape(1.dp)
+                )
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ── CRED-style wallet card ────────────────────────────────────────────
+        val sneakComp by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.loader_cat))
+        val quip = when {
+            balance < 0      -> "we need to\ntalk, hooman."
+            balance == 0     -> "the bowl is\nempty."
+            balance < 5000   -> "this worries\nme deeply."
+            balance < 15000  -> "getting\nthere..."
+            balance < 30000  -> "not bad,\nhooman."
+            balance < 60000  -> "this pleases\nme greatly."
+            balance < 100000 -> "very\nimpressive."
+            else             -> "i am fully\nsatisfied."
+        }
+
+        // Palette — all greyscale, CRED-inspired
+        val obsidian    = Color(0xFF0F0F0F)
+        val obsidian2   = Color(0xFF161616)
+        val silverText  = Color(0xFFE8E8E8)
+        val mutedText   = Color(0xFF888888)
+        val hairline    = Color(0xFFFFFFFF).copy(0.07f)
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(obsidian2, obsidian, Color(0xFF0A0A0A)),
+                        start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                        end = androidx.compose.ui.geometry.Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                    )
+                )
+                .border(0.6.dp, hairline, RoundedCornerShape(24.dp))
+        ) {
+            // Subtle top-edge gloss line
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color.Transparent, Color.White.copy(0.10f), Color.White.copy(0.14f), Color.White.copy(0.10f), Color.Transparent)
+                        )
+                    )
+            )
+
+            // ── Left content column ──────────────────────────────────────────
+            Column(modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 22.dp, end = 155.dp)) {
+
+                // Frosted pill chip — "expectr wallet"
+                Box(
+                    modifier = Modifier
+                        .background(Color.White.copy(0.06f), RoundedCornerShape(50.dp))
+                        .border(0.5.dp, Color.White.copy(0.10f), RoundedCornerShape(50.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        "EXPECTR WALLET",
+                        color = Color.White.copy(0.45f),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 2.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Text(
+                    "NET BALANCE",
+                    color = mutedText,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Normal,
+                    letterSpacing = 1.8.sp
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(color = Color.White.copy(0.30f), fontSize = 18.sp, fontWeight = FontWeight.Light)) {
+                            append("₹")
+                        }
+                        withStyle(
+                            SpanStyle(
+                                color = silverText,
+                                fontSize = 40.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = (-2).sp
+                            )
+                        ) { append(fmt.format(animatedBalance)) }
+                    }
+                )
+            }
+
+            // ── Cat + frosted thought bubble — right overlay ─────────────────
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .offset(x = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Frosted glass thought bubble
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .widthIn(max = 115.dp)
+                        .drawBehind {
+                            val rx = size.width / 2f; val ry = size.height / 2f
+                            // Deep frosted dark fill
+                            drawOval(Color(0xFF1A1A1A), Offset.Zero, size)
+                            // Subtle inner white glow
+                            drawOval(
+                                brush = Brush.radialGradient(
+                                    listOf(Color.White.copy(0.05f), Color.Transparent),
+                                    Offset(rx, ry), rx
+                                ),
+                                topLeft = Offset.Zero, size = size
+                            )
+                            // Thin white oval border
+                            drawOval(Color.White.copy(0.08f), Offset.Zero, size, style = Stroke(0.7.dp.toPx()))
+                        }
+                        .padding(horizontal = 12.dp, vertical = 9.dp)
+                ) {
+                    Text(
+                        quip,
+                        color = Color.White.copy(0.70f),
+                        fontSize = 12.sp,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        fontFamily = PlayfairDisplay,
+                        lineHeight = 16.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+
+                // Ascending white ring dots
+                Canvas(modifier = Modifier.size(width = 24.dp, height = 18.dp)) {
+                    val cx = size.width / 2f; val rs = 1.2.dp.toPx()
+                    drawCircle(Color.White.copy(0.40f), 4.4.dp.toPx(), Offset(cx, size.height * 0.84f), style = Stroke(rs))
+                    drawCircle(Color.White.copy(0.28f), 2.8.dp.toPx(), Offset(cx, size.height * 0.44f), style = Stroke(rs))
+                    drawCircle(Color.White.copy(0.18f), 1.5.dp.toPx(), Offset(cx, size.height * 0.10f), style = Stroke(rs))
+                }
+
+                LottieAnimation(
+                    composition = sneakComp,
+                    iterations = LottieConstants.IterateForever,
+                    modifier = Modifier.size(145.dp)
+                )
+            }
+        }
+
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+
+        // ── Spending gauge ───────────────────────────────────────────────────
+        // A full-width split bar: left = green (income), right = red (expense used)
+        // A white bubble sits at the boundary showing live split
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(10.dp)
+        ) {
+            val cornerR = size.height / 2f
+            val totalW = size.width
+
+            // Background track
+            drawRoundRect(
+                color = Color.White.copy(0.06f),
+                size = size,
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerR)
+            )
+
+            // Green income fill (full width = income baseline)
+            if (totalW > 0f) {
+                drawRoundRect(
+                    brush = Brush.horizontalGradient(
+                        listOf(green.copy(0.4f), green.copy(0.8f))
+                    ),
+                    size = Size(totalW, size.height),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerR)
+                )
+                // Red expense overlay from the left, growing proportionally
+                if (animatedSpend > 0f) {
+                    drawRoundRect(
+                        brush = Brush.horizontalGradient(
+                            listOf(red, red.copy(0.7f)),
+                            startX = 0f,
+                            endX = totalW * animatedSpend
+                        ),
+                        size = Size(totalW * animatedSpend, size.height),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerR)
+                    )
+                }
+                // White divider bubble at the boundary
+                val bubbleX = (totalW * animatedSpend).coerceIn(cornerR, totalW - cornerR)
+                drawCircle(
+                    color = Color.White,
+                    radius = size.height * 0.65f,
+                    center = Offset(bubbleX, size.height / 2f)
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = statusLine,
-            color = TextSecondary.copy(0.6f),
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Normal
-        )
-        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "₹${fmt.format(expense)} spent",
+                color = red.copy(0.7f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                "${(spendRatio * 100).toInt()}% of income",
+                color = TextSecondary.copy(0.45f),
+                fontSize = 11.sp
+            )
+            Text(
+                "₹${fmt.format(income)} earned",
+                color = green.copy(0.7f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        Spacer(modifier = Modifier.height(22.dp))
+
+        // ── Stat chips row ───────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // ── INCOME chip ─────────────────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(Color(0xFF0B3D2C), Color(0xFF0E5238)),
+                            start = Offset.Zero,
+                            end = Offset.Infinite
+                        )
+                    )
+            ) {
+                // Emerald accent bar at top
+                Box(modifier = Modifier.fillMaxWidth().height(2.5.dp).background(Color(0xFF10B981)))
+                Column(modifier = Modifier.padding(start = 12.dp, top = 14.dp, end = 12.dp, bottom = 12.dp)) {
+                    Text("INCOME", color = Color(0xFF34D399).copy(0.70f), fontSize = 8.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp)
+                    Spacer(modifier = Modifier.height(5.dp))
+                    Text("₹${fmt.format(income)}", color = Color(0xFF6EE7B7), fontSize = 15.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.5).sp)
+                }
+            }
+            // ── SPENT chip ──────────────────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(Color(0xFF3D0C18), Color(0xFF521122)),
+                            start = Offset.Zero,
+                            end = Offset.Infinite
+                        )
+                    )
+            ) {
+                // Rose accent bar at top
+                Box(modifier = Modifier.fillMaxWidth().height(2.5.dp).background(Color(0xFFF43F5E)))
+                Column(modifier = Modifier.padding(start = 12.dp, top = 14.dp, end = 12.dp, bottom = 12.dp)) {
+                    Text("SPENT", color = Color(0xFFFB7185).copy(0.70f), fontSize = 8.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp)
+                    Spacer(modifier = Modifier.height(5.dp))
+                    Text("₹${fmt.format(expense)}", color = Color(0xFFFDA4AF), fontSize = 15.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.5).sp)
+                }
+            }
+            // ── ENTRIES chip ─────────────────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .weight(0.65f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(Color(0xFF0C1B3D), Color(0xFF102554)),
+                            start = Offset.Zero,
+                            end = Offset.Infinite
+                        )
+                    )
+            ) {
+                // Indigo accent bar at top
+                Box(modifier = Modifier.fillMaxWidth().height(2.5.dp).background(Color(0xFF818CF8)))
+                Column(modifier = Modifier.padding(start = 12.dp, top = 14.dp, end = 12.dp, bottom = 12.dp)) {
+                    Text("ENTRIES", color = Color(0xFFA5B4FC).copy(0.70f), fontSize = 8.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp)
+                    Spacer(modifier = Modifier.height(5.dp))
+                    Text("$txnCount", color = Color(0xFFC7D2FE), fontSize = 15.sp, fontWeight = FontWeight.Black)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // ── View all row ─────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onTxnsClick() },
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("View all transactions", color = Color.White.copy(0.35f), fontSize = 11.sp, letterSpacing = 0.3.sp)
+            Spacer(modifier = Modifier.width(4.dp))
+            Icon(Icons.Default.ChevronRight, null, tint = Color.White.copy(0.25f), modifier = Modifier.size(14.dp))
+        }
     }
 }
 
 
+
+
 // --- TITANIUM DEBIT CARD ---
+
 
 private val CardGold = Color(0xFFE5C158)
 private val ChipGold = Color(0xFFD4AF37)
