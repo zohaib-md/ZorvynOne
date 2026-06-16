@@ -1,14 +1,24 @@
-# ✦ Expectr[Formerly ZorvynOne] | Next-Gen Personal Finance
+# ✦ Expectr | Next-Gen Personal Finance
 
 > A premium, AI-powered personal finance and habit-tracking Android application built entirely with Jetpack Compose. 
 
-ZorvynOne rethinks the standard budgeting app by combining real-time algorithmic health scoring, hyper-premium 3D UI interactions, and on-device privacy. It doesn't just track your money—it grades your financial discipline and provides Gemini AI-driven insights to help you build better wealth habits.
+Expectr (formerly ZorvynOne) rethinks the standard budgeting app by combining real-time algorithmic health scoring, hyper-premium 3D UI interactions, and on-device privacy. It doesn't just track your money—it grades your financial discipline and provides Gemini AI-driven insights to help you build better wealth habits.
 
 ---
 
-## Key Features
+## 📸 Screenshots
 
-* **Algorithmic Health Score:** Moves beyond simple balances. An interactive, real-time "Zorvyn Score" that reacts instantly to your income, expenses, and accepted financial habits.
+| Dashboard | Insights & Habits | Transactions |
+| :---: | :---: | :---: |
+| <img src="screenshots/dashboard.png" width="250" /> | <img src="screenshots/insights.png" width="250" /> | <img src="screenshots/transactions.png" width="250" /> |
+
+*(Note: Add screenshot images to the `screenshots/` directory in the repository to display them here)*
+
+---
+
+## ✨ Key Features
+
+* **Algorithmic Health Score:** Moves beyond simple balances. An interactive, real-time "Health Score" that reacts instantly to your income, expenses, and accepted financial habits.
 * **Dynamic 'Apple-Style' 3D UI:** Features an immersive, breathing metallic balance card with rolling number animations, deep casting shadows, and time-aware typography that adapts the greeting based on the user's clock.
 * **Gemini AI Integration:** A custom-built AI engine that analyzes local spending patterns to generate personalized financial insights and actionable habit plans.
 * **Flawless Navigation State:** Implements official Google-standard Bottom Navigation routing (`launchSingleTop`, `restoreState`) to prevent backstack freezing and ensure buttery-smooth tab switching.
@@ -16,7 +26,7 @@ ZorvynOne rethinks the standard budgeting app by combining real-time algorithmic
 
 ---
 
-##  Tech Stack & Architecture
+## 🛠 Tech Stack & Architecture
 
 This project strictly adheres to modern Android Development standards:
 * **UI:** 100% Kotlin & Jetpack Compose (Material 3)
@@ -28,12 +38,12 @@ This project strictly adheres to modern Android Development standards:
 
 ---
 
-## Technical Decisions & Trade-offs
+## 🧠 Technical Decisions & Trade-offs
 
 * **UI/UX Architecture:** Built entirely with Jetpack Compose to leverage a purely state-driven UI, enabling complex, high-performance visual elements—like the 3D animated balance card and dynamic typography—without the overhead of traditional XML layouts.
 * **Navigation State Management:** Engineered a unified Compose Navigation graph utilizing `launchSingleTop` and `restoreState` routing rules to effectively manage the backstack, preventing memory leaks and UI freezing during rapid bottom-tab switching.
 * **AI Integration Trade-off:** Opted to build a custom REST client to communicate directly with the Gemini model rather than importing heavy official SDKs, trading rapid setup convenience for a significantly smaller APK size and granular control over JSON parsing.
-* **Data Privacy & Latency (Trade-off):** Chose a local, offline-first SQLite architecture to process transactions and calculate the "Zorvyn Health Score" dynamically on-device, prioritizing strict user data privacy and zero-latency UI updates over multi-device cloud synchronization.
+* **Data Privacy & Latency (Trade-off):** Chose a local, offline-first SQLite architecture to process transactions and calculate the Health Score dynamically on-device, prioritizing strict user data privacy and zero-latency UI updates over multi-device cloud synchronization.
 * **State Reactivity:** The application's core logic is heavily reactive; accepting an AI-suggested financial habit immediately recalculates global state variables via Kotlin Flows, triggering seamless, real-time visual updates across multiple deeply nested screens.
 
 ---
@@ -47,4 +57,13 @@ This project strictly adheres to modern Android Development standards:
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/yourusername/ZorvynOne.git](https://github.com/yourusername/ZorvynOne.git)
+   git clone https://github.com/yourusername/Expectr.git
+   ```
+2. Open the project in Android Studio.
+3. Sync the project with Gradle files.
+4. Run the app on an emulator or physical device.
+
+---
+
+## 📄 License
+This project is licensed under the MIT License.
