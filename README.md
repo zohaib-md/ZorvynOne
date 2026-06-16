@@ -6,7 +6,7 @@ Expectr (formerly ZorvynOne) rethinks the standard budgeting app by combining re
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/a62b5265-ab24-46c7-b18b-e78b4c695fd3" width="18%" />
@@ -18,7 +18,7 @@ Expectr (formerly ZorvynOne) rethinks the standard budgeting app by combining re
 
 ---
 
-## ✨ Key Features
+##  Key Features
 
 * **Algorithmic Health Score:** Moves beyond simple balances. An interactive, real-time "Health Score" that reacts instantly to your income, expenses, and accepted financial habits.
 * **Dynamic 'Apple-Style' 3D UI:** Features an immersive, breathing metallic balance card with rolling number animations, deep casting shadows, and time-aware typography that adapts the greeting based on the user's clock.
@@ -28,7 +28,7 @@ Expectr (formerly ZorvynOne) rethinks the standard budgeting app by combining re
 
 ---
 
-## 🛠 Tech Stack & Architecture
+##  Tech Stack & Architecture
 
 This project strictly adheres to modern Android Development standards:
 * **UI:** 100% Kotlin & Jetpack Compose (Material 3)
@@ -40,7 +40,7 @@ This project strictly adheres to modern Android Development standards:
 
 ---
 
-## 🧠 Technical Decisions & Trade-offs
+##  Technical Decisions & Trade-offs
 
 * **UI/UX Architecture:** Built entirely with Jetpack Compose to leverage a purely state-driven UI, enabling complex, high-performance visual elements—like the 3D animated balance card and dynamic typography—without the overhead of traditional XML layouts.
 * **Navigation State Management:** Engineered a unified Compose Navigation graph utilizing `launchSingleTop` and `restoreState` routing rules to effectively manage the backstack, preventing memory leaks and UI freezing during rapid bottom-tab switching.
