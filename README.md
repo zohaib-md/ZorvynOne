@@ -10,7 +10,10 @@ Expectr (formerly ZorvynOne) rethinks the standard budgeting app by combining re
 
 | Dashboard | Insights & Habits | Transactions |
 | :---: | :---: | :---: |
-| <img src="screenshots/dashboard.png" width="250" /> | <img src="screenshots/insights.png" width="250" /> | <img src="screenshots/transactions.png" width="250" /> |
+|<img width="1080" height="1920" alt="Untitled design (4)" src="https://github.com/user-attachments/assets/a62b5265-ab24-46c7-b18b-e78b4c695fd3" /> | <img width="1080" height="1920" alt="Untitled design (5)" src="https://github.com/user-attachments/assets/60410560-02ee-4137-8c71-2fadb0f68ebd" />
+ | <img width="1080" height="1920" alt="Untitled design (7)" src="https://github.com/user-attachments/assets/f4440fc7-3981-49b7-90b6-8997b123669f" />|| <img width="1080" height="1920" alt="Untitled design (10)" src="https://github.com/user-attachments/assets/05e8043e-43db-437f-8d6e-cb08670bdf62" />| |<img width="1080" height="1920" alt="Untitled design (11)" src="https://github.com/user-attachments/assets/7810e624-ad30-4174-a8b9-6b6202bbc0f3" />| 
+
+ 
 
 *(Note: Add screenshot images to the `screenshots/` directory in the repository to display them here)*
 
